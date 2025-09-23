@@ -5,11 +5,11 @@ fs.writeFileSync('build/.nojekyll', '');
 
 publish('build', {
         branch: 'gh-pages',
-        repo: 'https://github.com/pawo161/portfolio_new',
+        repo: 'https://github.com/pawelknorps/pawelknorps.github.io/',
         dotfiles: true,
         user: {
-            name: 'pawo161',
-            email: 'pawo161@gmail.com'
+            name: 'pawelknorps',
+            email: 'pawel.knorps@gmail.com'
         }
     },
     () => { console.log('Github Page Deployed') }

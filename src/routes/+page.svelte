@@ -194,7 +194,13 @@
 			}
 		};
     });
-
+	const controls = new OrbitControls(camera, renderer.domElement);
+	controls.enableDamping = true;
+	
+	// Apply the fix only on touch-enabled devices (i.e., mobile)
+	if ('ontouchstart' in window) {
+	  renderer.domElement.style.touchAction = 'pan-y';
+	};
 	// Add a manual initialization trigger for debugging
 	const handleCanvasClick = () => {
 		if (!sceneInitialized) {

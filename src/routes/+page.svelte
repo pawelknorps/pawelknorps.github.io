@@ -40,7 +40,7 @@
 	// Create a new wavy sphere scene
 	let ThreeObject;
 	let sceneInitialized = false;
-	
+	let sceneReady = false; // New state to track if the scene is loaded
 	// Project data
 	let personalData = {};
 	let musicProjects = [];
@@ -121,7 +121,7 @@
 			adaptiveSubTextClass = 'text-gray-300';
 		}
 	}
-
+	
 	// Initialize the 3D scene
 	const initializeScene = async () => {
 		if (!ThreeObject || sceneInitialized) return;
@@ -237,7 +237,18 @@
 </script>
 
 <svelte:window bind:scrollY bind:innerHeight bind:innerWidth />
+{#if !sceneReady}
+		<div class="fixed top-0 left-0 w-full h-full gradient-placeholder z-0"></div> 
+	{/if}
 
+	<canvas  
+		bind:this={ThreeObject}  
+		on:click={handleCanvasClick}
+		class="fixed top-0 left-0 w-full h-full cursor-grab transition-opacity duration-1000"
+		style:opacity={sceneReady ? 1 : 0} 
+		style:pointer-events={sceneReady ? 'auto' : 'none'} 
+		style:z-index={0}
+	></canvas>
 <!-- Simple audio enable notice - top center -->
 {#if sceneInitialized && !isAudioEnabled}
 <div class="audio-notice fixed top-6 left-1/2 transform -translate-x-1/2 z-50 bg-black/80 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm border border-white/20 transition-all duration-300">
@@ -341,7 +352,7 @@
 	}
 
 	/* Responsive adjustments for mobile */
-	@media (max-width: 768px) {
+	@media (max-width: 800px) {
 		.projects-container {
 			padding: 0 1rem;
 		}
@@ -362,6 +373,23 @@
 		background-color: #FF0080;
 		color: white;
 	}
+	   .gradient-placeholder {
+        background: linear-gradient(-45deg, #0f0f0f, #1a1a1a, #2a2a2a, #3a3a3a);
+        background-size: 400% 400%;
+        animation: gradient-animation 15s ease infinite;
+    }
+
+    @keyframes gradient-animation {
+        0% {
+            background-position: 0% 50%;
+        }
+        50% {
+            background-position: 100% 50%;
+        }
+        100% {
+            background-position: 0% 50%;
+        }
+    }
 
 	/* Remove any visual separations */
 	* {

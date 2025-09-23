@@ -21,6 +21,7 @@
 	import { setScene, updateProjects, setAudioSystem } from '$lib/ThreeObject.js';
 	import { fade } from "svelte/transition";
 	import { onMount, tick } from 'svelte';
+	import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 	
 	// Import components
 	import HeroSection from '$lib/components/HeroSection.svelte';
@@ -194,7 +195,7 @@
 			}
 		};
     });
-	
+		
 	// Add a manual initialization trigger for debugging
 	const handleCanvasClick = () => {
 		if (!sceneInitialized) {
@@ -296,14 +297,16 @@
 		pointer-events: none; /* Re-enable pointer events for content */
 	}
 
-	/* Canvas styling */
+	/* By default, let Three.js control all gestures */
 	canvas {
-		touch-action: none; /* Prevent scroll on mobile when dragging */
+	touch-action: none;
 	}
 
-	/* Canvas styling */
+	/* For mobile screens, allow vertical page scrolling over the canvas */
+	@media (max-width: 768px) {
 	canvas {
-		touch-action: none; /* Prevent scroll on mobile when dragging */
+		touch-action: pan-y;
+	}
 	}
 
 	/* Simple audio notice */

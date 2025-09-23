@@ -1,3 +1,20 @@
+<svelte:head>
+    <title>Paweł Knorps - Composer Guitarist Portfolio</title>
+    <meta name="description" content="Portfolio of Paweł Knorps, a composer, guitarist, basist, producer." />
+    <link rel="canonical" href="https://pawelknorps.github.io/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://pawelknorps.github.io/" />
+    <meta property="og:title" content="Paweł Knorps - Composer Guitarist Portfolio" />
+    <meta property="og:description" content="Portfolio of Paweł Knorps, a composer, guitarist, basist, producer." />
+    <meta property="og:image" content="https://pawelknorps.github.io/og-image.png" />
+
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://pawelknorps.github.io/" />
+    <meta property="twitter:title" content="Paweł Knorps - Composer Guitarist Portfolio" />
+    <meta property="twitter:description" content="Portfolio of Paweł Knorps, a composer, guitarist, basist, producer." />
+    <meta property="twitter:image" content="https://pawelknorps.github.io/og-image.png" />
+</svelte:head>
 <script>
 	// Library Imports
 	import { base } from '$app/paths';

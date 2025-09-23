@@ -330,13 +330,6 @@
 	touch-action: none;
 	}
 
-	/* For mobile screens, allow vertical page scrolling over the canvas */
-	@media (max-width: 768px) {
-	canvas {
-		touch-action: pan-y;
-	}
-	}
-
 	/* Simple audio notice */
 	.audio-notice {
 		animation: gentlePulse 2s ease-in-out infinite;
@@ -352,6 +345,9 @@
 		.projects-container {
 			padding: 0 1rem;
 		}
+		canvas {
+		touch-action: pan-y;
+	}
 	}
 
 	/* Large screen adjustments */

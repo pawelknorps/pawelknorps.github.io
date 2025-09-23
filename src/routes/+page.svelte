@@ -146,7 +146,35 @@
 			}
 			
 			// Start brightness sampling
-			brightnessInterval = setInterval(sampleCanvasBrightness, 200);
+			// In your page.svelte script
+
+			let frameCount = 0;
+			let brightnessInterval; // We'll keep this name for the handle
+
+			function startBrightnessSampling() {
+				function sampleLoop() {
+					// Only sample every 10 frames to save CPU
+					if (frameCount % 10 === 0) {
+						sampleCanvasBrightness();
+					}
+					frameCount++;
+					brightnessInterval = requestAnimationFrame(sampleLoop);
+				}
+				sampleLoop();
+			}
+
+			function stopBrightnessSampling() {
+				cancelAnimationFrame(brightnessInterval);
+			}
+
+			// In loadAndInitializeScene() function, replace setInterval:
+			// brightnessInterval = setInterval(sampleCanvasBrightness, 200); // <-- REMOVE
+			startBrightnessSampling(); // <-- ADD
+
+			// In your onMount's return function (cleanup):
+			return () => {
+				stopBrightnessSampling();
+			};
 			
 
 		} catch (error) {

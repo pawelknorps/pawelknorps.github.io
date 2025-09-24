@@ -9,13 +9,13 @@
 	$: bioOpacity = Math.max(0, Math.min(1, (scrollY - innerHeight * 0.2) / (innerHeight * 0.2)));
 	
 	// Calculate minimum height to match projects section
-	$: minBioHeight = Math.max(projectsHeight/2, innerHeight * 0.8);
+	// $: minBioHeight = Math.max(projectsHeight/2, innerHeight * 0.8);
 </script>
 
 <!-- Right side - Biographical text -->
 <div class="biographical-text">
 	<div class="bio-flow-container" 
-		 style="opacity: {bioOpacity}; min-height: {minBioHeight}px;">
+		 style="opacity: {bioOpacity}; min-height: 5rem;">
 		
 		<div class="bio-content-flow">
 			<h3 class="text-3xl xl:text-4xl font-black tracking-widest mb-8 opacity-80 adaptive-text"
@@ -25,27 +25,24 @@
 			</h3>
 			
 			<div class="bio-text text-base xl:text-mds leading-relaxed space-y-8 adaptive-subtext"
-				 class:text-gray-300={adaptiveSubTextClass === 'text-gray-300'}
-				 class:text-gray-200={adaptiveSubTextClass === 'text-gray-200'}
-				 class:text-gray-700={adaptiveSubTextClass === 'text-gray-700'}>
-				<p>Paweł Knorps jest aktywnym muzykiem na polskiej i duńskiej scenie. Niedawno obronił dyplom magisterski z gitary jazzowej na poznańskiej Akademii, a niedługo później również dyplom magisterski z kompozycji jazzowej na prestiżowej uczelni Danish National Academy of Music w Odense.</p>
-				
-				<p>Jest głównie muzykiem improwizującym – zawodowo gitarzystą, ale również basistą, producentem muzycznym i kompozytorem. Interesuje go szczególnie tworzenie muzyki, która przekracza utrwalone granice. Kluczowa jest dla niego swobodna ekspresja i niczym nieskrępowana kreatywność.</p>
-				
-				<p>Jego nowy projekt to oryginalny jazzowy materiał grany z poznańskimi jazzmanami – Krzysztofem Dysem, Dawidem Tokłowiczem, Piotrem Cienkowskim, Kajetanem Pilarskim. Działają pod nazwą <span class="text-[#FF0080] font-semibold">Pawel Knorps Group</span>, jest to debiutancki projekt Pawła jako lidera i kompozytora muzyki jazzowej.</p>
-				
-				<p>Są jednym z sześciu finalistów Blue Note Competition 2024, gdzie zostali wybrani spośród prawie 50 zespołów jazzowych z Europy.</p>
-				
-				<p>Paweł jest głęboko zaangażowany w tworzenie miejskiej tkanki kulturalnej Poznania. Od 2019 roku jest jedną z osób zarządzających i tworzących <span class="text-[#FF0080] font-semibold">Kołorking Muzyczny</span> na Św. Marcinie 75.</p>
-				
-				<p>Zorganizował tam kilkadziesiąt wydarzeń – koncertów, warsztatów, spotkań, prób muzycznych. Jest to oddolna inicjatywa, która wspiera społeczeństwo w rozwoju muzycznym bez barier – bez kosztów finansowych i ze wsparciem mentorskim.</p>
-				
-				<p>Jego poboczną pasją jest produkcja i tworzenie muzyki elektronicznej jako <span class="text-[#FF0080] font-semibold">enthymeme</span>. Grał improwizowaną, eksperymentalną tkankę dźwiękową w takich klubach jak: Dom Technika, Farby, My, Mózg Bydgoszcz.</p>
-				
-				<p>Obecnie po powrocie do Poznania w czerwcu 2024 ze studiów w Danii dołączył do poznańskich projektów: Milomi, SNY, MUIZK NVA LAB, Domsun.</p>
-			</div>
+                 class:text-gray-300={adaptiveSubTextClass === 'text-gray-300'}
+                 class:text-gray-200={adaptiveSubTextClass === 'text-gray-200'}
+                 class:text-gray-700={adaptiveSubTextClass === 'text-gray-700'}>
 
-			<div class="achievements-section mt-16">
+                <p>Paweł Knorps – artysta poruszający się między tradycją a eksploracją, oddany dźwiękowi jako sile przekraczającej granice. Absolwent gitary jazzowej poznańskiej Akademii Muzycznej oraz kompozycji jazzowej na duńskiej Danish National Academy of Music w Odense.</p>
+                
+                <p>Jego muzyczna podróż jest skupiona wokół improwizacji – nie tylko na gitarze, ale również jako basista, producent i kompozytor. Paweł poszukuje w muzyce przestrzeni wolności, miejsca, gdzie intuicja spotyka się z ryzykiem, a dźwięk przeistacza się w narrację.</p>
+                
+                <p>Jego zespół <span class="text-[#FF0080] font-semibold">Pawel Knorps Group</span>, tworzony z wybitnymi poznańskimi muzykami, to świadectwo tej wizji – jazzowy dialog, wyrastający z lat doświadczeń muzycznych, ekspresji i otwartości. Projekt ten zdobył uznanie w finale Blue Note Competition 2024, podkreślając siłę jego kompozytorskiego głosu.</p>
+                
+                <p>Jego alter ego – <span class="text-[#FF0080] font-semibold">enthymeme</span> – to świat elektronicznej improwizacji. W dźwiękach klubów takich jak Farby czy Dom Technika tworzy on pejzaże z pogranicza chaosu i struktury, gdzie technologia spotyka się z ludzkim dotykiem.</p>
+                
+                <p>Dziś, po powrocie z Danii, Paweł zasila poznańskie projekty – od delikatnych brzmień <span class="text-[#FF0080] font-semibold">Milomi</span>, przez senne marzenia <span class="text-[#FF0080] font-semibold">SNY</span>, folkowo-djentowe eksploracje kolektywu <span class="text-[#FF0080] font-semibold">Przesilenie</span>, world-music z <span class="text-[#FF0080] font-semibold">GānāVānā</span>, po alternatywne i orientalne brzmienia <span class="text-[#FF0080] font-semibold">Aktas Erdogan Trio</span>.</p>
+
+                <p>Każda z tych formacji jest przejawem niezaspokojonej ciekawości w poszukiwaniu własnej ekspresji.</p>
+            </div>
+
+			<!-- <div class="achievements-section mt-16">
 				<h3 class="text-2xl xl:text-3xl font-black tracking-widest mb-8 opacity-80 adaptive-text"
 					class:text-white={adaptiveTextClass === 'text-white'}
 					class:text-gray-900={adaptiveTextClass === 'text-gray-900'}>
@@ -71,7 +68,7 @@
 						<span class="text-[#FF0080] font-bold text-lg">2024</span> - otrzymał Stypendium Twórcze Miasta Poznania za projekt „Jazzowa tkanka miasta – album inspirowany dźwiękami Poznania"
 					</div>
 				</div>
-			</div>
+			</div> -->
 		</div>
 	</div>
 </div>
@@ -84,7 +81,7 @@
 
 	.bio-flow-container {
 		position: relative;
-		margin-top: 25rem;
+		margin-top: 20rem;
 		top: 2rem;
 		padding: 2rem;
 		transition: opacity 0.9s cubic-bezier(0.4, 0, 0.2, 1);

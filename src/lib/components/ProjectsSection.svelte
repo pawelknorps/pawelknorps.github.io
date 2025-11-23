@@ -1,6 +1,6 @@
 <script>
 	import { fade } from "svelte/transition";
-	
+
 	export let musicProjects;
 	export let programmingProjects;
 	export let adaptiveTextClass;
@@ -9,54 +9,382 @@
 
 <!-- Music Projects -->
 {#if musicProjects.length > 0}
-	<div class="project-group mb-32 w-full xl:flex xl:flex-col xl:items-start xl:w-[40rem]">
-
-		<h3 class="text-3xl font-black tracking-widest mb-16 opacity-80 adaptive-text w-full xl:w-[40rem]"
-			class:text-white={adaptiveTextClass === 'text-white'}
-			class:text-gray-900={adaptiveTextClass === 'text-gray-900'}>
+	<div
+		class="project-group mb-32 w-full xl:flex xl:flex-col xl:items-start xl:w-[40rem]"
+	>
+		<h3
+			class="text-3xl font-black tracking-widest mb-16 opacity-80 adaptive-text w-full xl:w-[40rem]"
+			class:text-white={adaptiveTextClass === "text-white"}
+			class:text-gray-900={adaptiveTextClass === "text-gray-900"}
+		>
 			<mark style="background: none;" class="text-[#FF0080]">//</mark> MUSIC
 		</h3>
 		{#each musicProjects as data, i}
-			<div id="music-{i}" class="group my-20 translate-y-0 hover:-translate-y-8 duration-[400ms] ease-in-out w-[20rem] md:w-[40rem] lg:w-[30rem] xl:w-[40rem] project-card pointer-events-auto" in:fade={{ delay: 250 * i, duration: 1000 }}>
-				{#if data.links}
+			{@const youtubeId = data.links?.youtube
+				? (() => {
+						const regExp =
+							/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+						const match = data.links.youtube.match(regExp);
+						return match && match[2].length === 11
+							? match[2]
+							: null;
+					})()
+				: null}
+
+			{@const facebookUrl =
+				!youtubeId &&
+				data.links?.facebook &&
+				(data.links.facebook.includes("/videos/") ||
+					data.links.facebook.includes("/watch") ||
+					data.links.facebook.includes("/reel/"))
+					? data.links.facebook
+					: null}
+
+			{@const soundcloudUrl =
+				!youtubeId &&
+				!facebookUrl &&
+				data.links?.soundcloud &&
+				data.links.soundcloud.includes("soundcloud.com")
+					? data.links.soundcloud
+					: null}
+
+			{@const instagramUrl =
+				!youtubeId &&
+				!facebookUrl &&
+				!soundcloudUrl &&
+				data.links?.instagram &&
+				(data.links.instagram.includes("instagram.com/p/") ||
+					data.links.instagram.includes("instagram.com/reel/"))
+					? data.links.instagram
+					: null}
+
+			<div
+				id="music-{i}"
+				class="group my-20 translate-y-0 hover:-translate-y-8 duration-[400ms] ease-in-out w-[20rem] md:w-[40rem] lg:w-[30rem] xl:w-[40rem] project-card pointer-events-auto"
+				in:fade={{ delay: 250 * i, duration: 1000 }}
+			>
+				{#if youtubeId}
+					<!-- YouTube Video -->
+					<div
+						class="block h-auto px-0 py-0 tracking-widest transition-all duration-300"
+					>
+						<h2
+							class="text-xl font-black mb-4 adaptive-text"
+							class:text-white={adaptiveTextClass ===
+								"text-white"}
+							class:text-gray-900={adaptiveTextClass ===
+								"text-gray-900"}
+						>
+							<mark
+								style="background: none;"
+								class="text-[#FF0080]">.</mark
+							>&nbsp;{data.title}
+						</h2>
+
+						<!-- Video Container -->
+						<div
+							class="relative w-full aspect-video mb-6 rounded-lg overflow-hidden border border-white/10 shadow-lg"
+						>
+							<iframe
+								width="100%"
+								height="100%"
+								src="https://www.youtube.com/embed/{youtubeId}"
+								title={data.title}
+								frameborder="0"
+								allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+								allowfullscreen
+								class="absolute top-0 left-0 w-full h-full"
+							></iframe>
+						</div>
+
+						<h2
+							class="text-md font-base mb-6 leading-relaxed adaptive-subtext"
+							class:text-gray-300={adaptiveSubTextClass ===
+								"text-gray-300"}
+							class:text-gray-200={adaptiveSubTextClass ===
+								"text-gray-200"}
+							class:text-gray-700={adaptiveSubTextClass ===
+								"text-gray-700"}
+						>
+							{data.description}
+						</h2>
+
+						<div class="flex flex-wrap gap-3 mb-4">
+							{#if data.features}
+								{#each data.features as feature}
+									<span
+										class="text-[0.65rem] text-[#FF0080] tracking-widest uppercase font-semibold border border-[#FF0080]/30 px-3 py-1 rounded-full"
+										>{feature}</span
+									>
+								{/each}
+							{/if}
+						</div>
+
+						<!-- External Links -->
+						<div class="flex flex-wrap gap-4 mt-4">
+							{#if data.links}
+								{#each Object.entries(data.links) as [platform, url]}
+									{#if (platform !== "youtube" || !youtubeId) && url && url !== "#" && url !== ""}
+										<a
+											href={url}
+											target="_blank"
+											rel="noopener noreferrer"
+											class="text-xs uppercase tracking-widest hover:text-[#FF0080] transition-colors duration-300 adaptive-subtext border-b border-transparent hover:border-[#FF0080]"
+											class:text-gray-300={adaptiveSubTextClass ===
+												"text-gray-300"}
+											class:text-gray-200={adaptiveSubTextClass ===
+												"text-gray-200"}
+											class:text-gray-700={adaptiveSubTextClass ===
+												"text-gray-700"}
+										>
+											{platform} ↗
+										</a>
+									{/if}
+								{/each}
+							{/if}
+						</div>
+					</div>
+				{:else if facebookUrl}
+					<!-- Facebook Video -->
+					<div
+						class="block h-auto px-0 py-0 tracking-widest transition-all duration-300"
+					>
+						<h2
+							class="text-xl font-black mb-4 adaptive-text"
+							class:text-white={adaptiveTextClass ===
+								"text-white"}
+							class:text-gray-900={adaptiveTextClass ===
+								"text-gray-900"}
+						>
+							<mark
+								style="background: none;"
+								class="text-[#FF0080]">.</mark
+							>&nbsp;{data.title}
+						</h2>
+
+						<!-- Changed aspect ratio to square and center-cropped for Facebook reels/videos -->
+						<div
+							class="relative w-full aspect-square max-h-[600px] mb-6 rounded-lg overflow-hidden border border-white/10 shadow-lg bg-black"
+						>
+							<iframe
+								src="https://www.facebook.com/plugins/video.php?href={encodeURIComponent(
+									facebookUrl,
+								)}&show_text=false&t=0"
+								width="100%"
+								height="177.77%"
+								style="border:none;overflow:hidden; transform: translateY(-50%);"
+								scrolling="no"
+								frameborder="0"
+								allowfullscreen="true"
+								allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+								class="absolute top-1/2 left-0 w-full"
+							></iframe>
+						</div>
+
+						<h2
+							class="text-md font-base mb-6 leading-relaxed adaptive-subtext"
+							class:text-gray-300={adaptiveSubTextClass ===
+								"text-gray-300"}
+							class:text-gray-200={adaptiveSubTextClass ===
+								"text-gray-200"}
+							class:text-gray-700={adaptiveSubTextClass ===
+								"text-gray-700"}
+						>
+							{data.description}
+						</h2>
+
+						<div class="flex flex-wrap gap-3 mb-4">
+							{#if data.features}
+								{#each data.features as feature}
+									<span
+										class="text-[0.65rem] text-[#FF0080] tracking-widest uppercase font-semibold border border-[#FF0080]/30 px-3 py-1 rounded-full"
+										>{feature}</span
+									>
+								{/each}
+							{/if}
+						</div>
+
+						<div class="flex flex-wrap gap-4 mt-4">
+							{#if data.links}
+								{#each Object.entries(data.links) as [platform, url]}
+									{#if (platform !== "facebook" || !facebookUrl) && url && url !== "#" && url !== ""}
+										<a
+											href={url}
+											target="_blank"
+											rel="noopener noreferrer"
+											class="text-xs uppercase tracking-widest hover:text-[#FF0080] transition-colors duration-300 adaptive-subtext border-b border-transparent hover:border-[#FF0080]"
+											class:text-gray-300={adaptiveSubTextClass ===
+												"text-gray-300"}
+											class:text-gray-200={adaptiveSubTextClass ===
+												"text-gray-200"}
+											class:text-gray-700={adaptiveSubTextClass ===
+												"text-gray-700"}
+										>
+											{platform} ↗
+										</a>
+									{/if}
+								{/each}
+							{/if}
+						</div>
+					</div>
+				{:else if soundcloudUrl}
+					<!-- SoundCloud Player -->
+					<div
+						class="block h-auto px-0 py-0 tracking-widest transition-all duration-300"
+					>
+						<h2
+							class="text-xl font-black mb-4 adaptive-text"
+							class:text-white={adaptiveTextClass ===
+								"text-white"}
+							class:text-gray-900={adaptiveTextClass ===
+								"text-gray-900"}
+						>
+							<mark
+								style="background: none;"
+								class="text-[#FF0080]">.</mark
+							>&nbsp;{data.title}
+						</h2>
+
+						<div
+							class="relative w-full mb-6 rounded-lg overflow-hidden border border-white/10 shadow-lg"
+						>
+							<iframe
+								width="100%"
+								height="166"
+								scrolling="no"
+								frameborder="no"
+								allow="autoplay"
+								src="https://w.soundcloud.com/player/?url={encodeURIComponent(
+									soundcloudUrl,
+								)}&color=%23ff0080&auto_play=false&hide_related=false&show_comments=true&show_user=true&show_reposts=false&show_teaser=true"
+							></iframe>
+						</div>
+
+						<h2
+							class="text-md font-base mb-6 leading-relaxed adaptive-subtext"
+							class:text-gray-300={adaptiveSubTextClass ===
+								"text-gray-300"}
+							class:text-gray-200={adaptiveSubTextClass ===
+								"text-gray-200"}
+							class:text-gray-700={adaptiveSubTextClass ===
+								"text-gray-700"}
+						>
+							{data.description}
+						</h2>
+
+						<div class="flex flex-wrap gap-3 mb-4">
+							{#if data.features}
+								{#each data.features as feature}
+									<span
+										class="text-[0.65rem] text-[#FF0080] tracking-widest uppercase font-semibold border border-[#FF0080]/30 px-3 py-1 rounded-full"
+										>{feature}</span
+									>
+								{/each}
+							{/if}
+						</div>
+
+						<div class="flex flex-wrap gap-4 mt-4">
+							{#if data.links}
+								{#each Object.entries(data.links) as [platform, url]}
+									{#if (platform !== "soundcloud" || !soundcloudUrl) && url && url !== "#" && url !== ""}
+										<a
+											href={url}
+											target="_blank"
+											rel="noopener noreferrer"
+											class="text-xs uppercase tracking-widest hover:text-[#FF0080] transition-colors duration-300 adaptive-subtext border-b border-transparent hover:border-[#FF0080]"
+											class:text-gray-300={adaptiveSubTextClass ===
+												"text-gray-300"}
+											class:text-gray-200={adaptiveSubTextClass ===
+												"text-gray-200"}
+											class:text-gray-700={adaptiveSubTextClass ===
+												"text-gray-700"}
+										>
+											{platform} ↗
+										</a>
+									{/if}
+								{/each}
+							{/if}
+						</div>
+					</div>
+				{:else if data.links}
 					<a
-						href={data.links.youtube || data.links.bandcamp || data.links.soundcloud || data.links.facebook}
+						href={data.links.youtube ||
+							data.links.bandcamp ||
+							data.links.soundcloud ||
+							data.links.facebook ||
+							data.links.instagram ||
+							data.links.website ||
+							data.links.maps}
 						rel="noopener noreferrer"
 						target="_blank"
 						class="block h-auto px-0 py-0 tracking-widest transition-all duration-300 transform hover:scale-[1.02] cursor-pointer"
+					>
+						<h2
+							class="text-xl font-black mb-4 hover:text-[#FF0080] transition-colors duration-300 adaptive-text"
+							class:text-white={adaptiveTextClass ===
+								"text-white"}
+							class:text-gray-900={adaptiveTextClass ===
+								"text-gray-900"}
 						>
-						<h2 class="text-xl font-black mb-4 hover:text-[#FF0080] transition-colors duration-300 adaptive-text"
-							class:text-white={adaptiveTextClass === 'text-white'}
-							class:text-gray-900={adaptiveTextClass === 'text-gray-900'}>
-							<mark style="background: none;" class="text-[#FF0080]">.</mark>&nbsp;{data.title}
+							<mark
+								style="background: none;"
+								class="text-[#FF0080]">.</mark
+							>&nbsp;{data.title}
 						</h2>
-						<h2 class="text-md font-base mb-6 leading-relaxed adaptive-subtext"
-							class:text-gray-300={adaptiveSubTextClass === 'text-gray-300'}
-							class:text-gray-200={adaptiveSubTextClass === 'text-gray-200'}
-							class:text-gray-700={adaptiveSubTextClass === 'text-gray-700'}>{data.description}</h2>
+						<h2
+							class="text-md font-base mb-6 leading-relaxed adaptive-subtext"
+							class:text-gray-300={adaptiveSubTextClass ===
+								"text-gray-300"}
+							class:text-gray-200={adaptiveSubTextClass ===
+								"text-gray-200"}
+							class:text-gray-700={adaptiveSubTextClass ===
+								"text-gray-700"}
+						>
+							{data.description}
+						</h2>
 						<div class="flex flex-wrap gap-3">
 							{#if data.features}
 								{#each data.features as feature}
-									<span class="text-[0.65rem] text-[#FF0080] tracking-widest uppercase font-semibold border border-[#FF0080]/30 px-3 py-1 rounded-full transform hover:skew-x-3 transition-transform duration-200">{feature}</span>
+									<span
+										class="text-[0.65rem] text-[#FF0080] tracking-widest uppercase font-semibold border border-[#FF0080]/30 px-3 py-1 rounded-full transform hover:skew-x-3 transition-transform duration-200"
+										>{feature}</span
+									>
 								{/each}
 							{/if}
 						</div>
 					</a>
 				{:else}
 					<div class="h-auto px-0 py-0 tracking-widest">
-						<h2 class="text-xl font-black mb-4 adaptive-text"
-							class:text-white={adaptiveTextClass === 'text-white'}
-							class:text-gray-900={adaptiveTextClass === 'text-gray-900'}>
-							<mark style="background: none;" class="text-[#FF0080]">.</mark>&nbsp;{data.title}
+						<h2
+							class="text-xl font-black mb-4 adaptive-text"
+							class:text-white={adaptiveTextClass ===
+								"text-white"}
+							class:text-gray-900={adaptiveTextClass ===
+								"text-gray-900"}
+						>
+							<mark
+								style="background: none;"
+								class="text-[#FF0080]">.</mark
+							>&nbsp;{data.title}
 						</h2>
-						<h2 class="text-md font-base mb-6 leading-relaxed adaptive-subtext"
-							class:text-gray-300={adaptiveSubTextClass === 'text-gray-300'}
-							class:text-gray-200={adaptiveSubTextClass === 'text-gray-200'}
-							class:text-gray-700={adaptiveSubTextClass === 'text-gray-700'}>{data.description}</h2>
+						<h2
+							class="text-md font-base mb-6 leading-relaxed adaptive-subtext"
+							class:text-gray-300={adaptiveSubTextClass ===
+								"text-gray-300"}
+							class:text-gray-200={adaptiveSubTextClass ===
+								"text-gray-200"}
+							class:text-gray-700={adaptiveSubTextClass ===
+								"text-gray-700"}
+						>
+							{data.description}
+						</h2>
 						<div class="flex flex-wrap gap-3">
 							{#if data.features}
 								{#each data.features as feature}
-									<span class="text-[0.65rem] text-[#FF0080] tracking-widest uppercase font-semibold border border-[#FF0080]/30 px-3 py-1 rounded-full">{feature}</span>
+									<span
+										class="text-[0.65rem] text-[#FF0080] tracking-widest uppercase font-semibold border border-[#FF0080]/30 px-3 py-1 rounded-full"
+										>{feature}</span
+									>
 								{/each}
 							{/if}
 						</div>
@@ -69,48 +397,98 @@
 
 <!-- Programming Projects -->
 {#if programmingProjects.length > 0}
-	<div class="project-group mb-32 w-full xl:flex xl:flex-col xl:items-start xl:w-[40rem]">
-		<h3 class="text-3xl font-black tracking-widest mb-16 opacity-80 adaptive-text w-full xl:w-[40rem]"
-			class:text-white={adaptiveTextClass === 'text-white'}
-			class:text-gray-900={adaptiveTextClass === 'text-gray-900'}>
+	<div
+		class="project-group mb-32 w-full xl:flex xl:flex-col xl:items-start xl:w-[40rem]"
+	>
+		<h3
+			class="text-3xl font-black tracking-widest mb-16 opacity-80 adaptive-text w-full xl:w-[40rem]"
+			class:text-white={adaptiveTextClass === "text-white"}
+			class:text-gray-900={adaptiveTextClass === "text-gray-900"}
+		>
 			<mark style="background: none;" class="text-[#FF0080]">//</mark> OTHER
 		</h3>
 		{#each programmingProjects as data, i}
-			<div id="programming-{i}" class="group my-20 translate-y-0 hover:-translate-y-8 duration-[400ms] ease-in-out w-[20rem] md:w-[40rem] lg:w-[30rem] xl:w-[40rem] project-card pointer-events-auto" in:fade={{ delay: 250 * (i + musicProjects.length), duration: 1000 }}>
+			<div
+				id="programming-{i}"
+				class="group my-20 translate-y-0 hover:-translate-y-8 duration-[400ms] ease-in-out w-[20rem] md:w-[40rem] lg:w-[30rem] xl:w-[40rem] project-card pointer-events-auto"
+				in:fade={{
+					delay: 250 * (i + musicProjects.length),
+					duration: 1000,
+				}}
+			>
 				{#if data.github || data.demo}
-					<a href={data.github || data.demo} rel="noopener noreferrer" target="_blank" class="block h-auto px-0 py-0 tracking-widest transition-all duration-300 transform hover:scale-[1.02] cursor-pointer">
-						<h2 class="text-xl font-black mb-4 hover:text-[#FF0080] transition-colors duration-300 adaptive-text"
-							class:text-white={adaptiveTextClass === 'text-white'}
-							class:text-gray-900={adaptiveTextClass === 'text-gray-900'}>
-							<mark style="background: none;" class="text-[#FF0080]">.</mark>&nbsp;{data.title}
+					<a
+						href={data.github || data.demo}
+						rel="noopener noreferrer"
+						target="_blank"
+						class="block h-auto px-0 py-0 tracking-widest transition-all duration-300 transform hover:scale-[1.02] cursor-pointer"
+					>
+						<h2
+							class="text-xl font-black mb-4 hover:text-[#FF0080] transition-colors duration-300 adaptive-text"
+							class:text-white={adaptiveTextClass ===
+								"text-white"}
+							class:text-gray-900={adaptiveTextClass ===
+								"text-gray-900"}
+						>
+							<mark
+								style="background: none;"
+								class="text-[#FF0080]">.</mark
+							>&nbsp;{data.title}
 						</h2>
-						<h2 class="text-md font-base mb-6 leading-relaxed adaptive-subtext"
-							class:text-gray-300={adaptiveSubTextClass === 'text-gray-300'}
-							class:text-gray-200={adaptiveSubTextClass === 'text-gray-200'}
-							class:text-gray-700={adaptiveSubTextClass === 'text-gray-700'}>{data.description}</h2>
+						<h2
+							class="text-md font-base mb-6 leading-relaxed adaptive-subtext"
+							class:text-gray-300={adaptiveSubTextClass ===
+								"text-gray-300"}
+							class:text-gray-200={adaptiveSubTextClass ===
+								"text-gray-200"}
+							class:text-gray-700={adaptiveSubTextClass ===
+								"text-gray-700"}
+						>
+							{data.description}
+						</h2>
 						<div class="flex flex-wrap gap-3">
 							{#if data.technologies}
 								{#each data.technologies as topic}
-									<span class="text-[0.65rem] text-[#FF0080] tracking-widest uppercase font-semibold border border-[#FF0080]/30 px-3 py-1 rounded-full transform hover:skew-x-3 transition-transform duration-200">{topic}</span>
+									<span
+										class="text-[0.65rem] text-[#FF0080] tracking-widest uppercase font-semibold border border-[#FF0080]/30 px-3 py-1 rounded-full transform hover:skew-x-3 transition-transform duration-200"
+										>{topic}</span
+									>
 								{/each}
 							{/if}
 						</div>
 					</a>
 				{:else}
 					<div class="h-auto px-0 py-0 tracking-widest">
-						<h2 class="text-xl font-black mb-4 adaptive-text"
-							class:text-white={adaptiveTextClass === 'text-white'}
-							class:text-gray-900={adaptiveTextClass === 'text-gray-900'}>
-							<mark style="background: none;" class="text-[#FF0080]">.</mark>&nbsp;{data.title}
+						<h2
+							class="text-xl font-black mb-4 adaptive-text"
+							class:text-white={adaptiveTextClass ===
+								"text-white"}
+							class:text-gray-900={adaptiveTextClass ===
+								"text-gray-900"}
+						>
+							<mark
+								style="background: none;"
+								class="text-[#FF0080]">.</mark
+							>&nbsp;{data.title}
 						</h2>
-						<h2 class="text-md font-base mb-6 leading-relaxed adaptive-subtext"
-							class:text-gray-300={adaptiveSubTextClass === 'text-gray-300'}
-							class:text-gray-200={adaptiveSubTextClass === 'text-gray-200'}
-							class:text-gray-700={adaptiveSubTextClass === 'text-gray-700'}>{data.description}</h2>
+						<h2
+							class="text-md font-base mb-6 leading-relaxed adaptive-subtext"
+							class:text-gray-300={adaptiveSubTextClass ===
+								"text-gray-300"}
+							class:text-gray-200={adaptiveSubTextClass ===
+								"text-gray-200"}
+							class:text-gray-700={adaptiveSubTextClass ===
+								"text-gray-700"}
+						>
+							{data.description}
+						</h2>
 						<div class="flex flex-wrap gap-3">
 							{#if data.technologies}
 								{#each data.technologies as topic}
-									<span class="text-[0.65rem] text-[#FF0080] tracking-widest uppercase font-semibold border border-[#FF0080]/30 px-3 py-1 rounded-full">{topic}</span>
+									<span
+										class="text-[0.65rem] text-[#FF0080] tracking-widest uppercase font-semibold border border-[#FF0080]/30 px-3 py-1 rounded-full"
+										>{topic}</span
+									>
 								{/each}
 							{/if}
 						</div>
@@ -143,7 +521,7 @@
 	}
 
 	.project-card::before {
-		content: '';
+		content: "";
 		position: absolute;
 		top: 0;
 		left: 0;
@@ -168,19 +546,20 @@
 	}
 
 	/* Adaptive text colors with smooth transitions */
-	.adaptive-text, .adaptive-subtext {
+	.adaptive-text,
+	.adaptive-subtext {
 		transition: color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 	}
 
 	.adaptive-text {
-		text-shadow: 
+		text-shadow:
 			0 0 10px rgba(0, 0, 0, 0.8),
 			0 2px 4px rgba(0, 0, 0, 0.6),
 			0 1px 2px rgba(0, 0, 0, 0.9);
 	}
 
 	.adaptive-subtext {
-		text-shadow: 
+		text-shadow:
 			0 0 8px rgba(0, 0, 0, 0.7),
 			0 1px 3px rgba(0, 0, 0, 0.5);
 	}

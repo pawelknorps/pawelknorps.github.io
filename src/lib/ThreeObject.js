@@ -37,7 +37,7 @@ const morphShader = {
         tDiffuse1: { value: texture[0] },
         tDiffuse2: { value: texture[1] },
         morphFactor: { value: n },
-        time: { value: 0}
+        time: { value: 0 }
     },
     vertexShader: `
         // Classic Perlin 3D Noise by Stefan Gustavson
@@ -131,8 +131,7 @@ const morphShader = {
         varying vec2 vUv;
 
         void main() {
-            vec2 offset = vec2(0.3, 0.2);
-            vec2 shiftedUv = fract(vUv + offset); 
+            vec2 shiftedUv = vUv; // Removed offset for correct video projection
             vec4 color1 = texture2D(tDiffuse1, shiftedUv);
             vec4 color2 = texture2D(tDiffuse2, shiftedUv);
             gl_FragColor = mix(color1, color2, morphFactor);
@@ -175,6 +174,7 @@ const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 let INTERSECTED = null;
 let interactionObjects = [];
+let cinemaVideo = null; // Track background video for audio control
 
 // Set audio system reference
 export const setAudioSystem = (system) => {
@@ -184,25 +184,25 @@ export const setAudioSystem = (system) => {
 // Audio initialization
 const initAudio = async () => {
     if (isAudioInitialized) return;
-    
+
     try {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        
+
         if (audioContext.state === 'suspended') {
             await audioContext.resume();
         }
-        
+
         // Master gain
         masterGain = audioContext.createGain();
         masterGain.gain.setValueAtTime(0.92, audioContext.currentTime);
         masterGain.connect(audioContext.destination);
-        
+
         // Create reverb
         const reverbTime = 2.8;
         const reverbLength = audioContext.sampleRate * reverbTime;
         reverb = audioContext.createConvolver();
         const impulseBuffer = audioContext.createBuffer(2, reverbLength, audioContext.sampleRate);
-        
+
         for (let channel = 0; channel < 2; channel++) {
             const channelData = impulseBuffer.getChannelData(channel);
             for (let i = 0; i < reverbLength; i++) {
@@ -212,25 +212,25 @@ const initAudio = async () => {
         }
         reverb.buffer = impulseBuffer;
         reverb.connect(masterGain);
-        
+
         // Create delay
         delay = audioContext.createDelay(1.0);
         delay.delayTime.setValueAtTime(0.25, audioContext.currentTime);
-        
+
         const delayFeedback = audioContext.createGain();
         delayFeedback.gain.setValueAtTime(0.3, audioContext.currentTime);
-        
+
         const delayWet = audioContext.createGain();
         delayWet.gain.setValueAtTime(0.2, audioContext.currentTime);
-        
+
         delay.connect(delayFeedback);
         delayFeedback.connect(delay);
         delay.connect(delayWet);
         delayWet.connect(masterGain);
-        
+
         isAudioInitialized = true;
         console.log('Audio initialized successfully');
-        
+
         // Hide audio notice
         const audioNotice = document.querySelector('.audio-notice');
         if (audioNotice) {
@@ -238,10 +238,10 @@ const initAudio = async () => {
             audioNotice.style.transform = 'translateY(-20px) translateX(-50%)';
             setTimeout(() => audioNotice?.remove(), 300);
         }
-        
+
         // Welcome sound
         playWelcomeSound();
-        
+
     } catch (error) {
         console.warn('Audio init failed:', error);
     }
@@ -250,16 +250,16 @@ const initAudio = async () => {
 // Audio functions
 const playWelcomeSound = () => {
     if (!isAudioInitialized) return;
-    
+
     const currentTime = audioContext.currentTime;
     const welcome = audioContext.createOscillator();
     welcome.type = 'sine';
     welcome.frequency.setValueAtTime(523, currentTime);
-    
+
     const welcomeGain = audioContext.createGain();
     welcomeGain.gain.setValueAtTime(0.02, currentTime);
     welcomeGain.gain.exponentialRampToValueAtTime(0.001, currentTime + 1.0);
-    
+
     welcome.connect(welcomeGain);
     welcomeGain.connect(reverb);
     welcome.start();
@@ -268,17 +268,17 @@ const playWelcomeSound = () => {
 
 const playDragSound = () => {
     if (!isAudioInitialized) return;
-    
+
     const currentTime = audioContext.currentTime;
-    
+
     const dragOsc = audioContext.createOscillator();
     dragOsc.type = 'triangle';
     dragOsc.frequency.setValueAtTime(120 + Math.random() * 80, currentTime);
-    
+
     const dragGain = audioContext.createGain();
     dragGain.gain.setValueAtTime(0.015, currentTime);
     dragGain.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.4);
-    
+
     dragOsc.connect(dragGain);
     dragGain.connect(delay);
     dragOsc.start();
@@ -287,34 +287,34 @@ const playDragSound = () => {
 
 const playClickSound = () => {
     if (!isAudioInitialized) return
-    
+
     const currentTime = audioContext.currentTime;
-    
+
     // FM synthesis click
     const carrier = audioContext.createOscillator();
     const modulator = audioContext.createOscillator();
-    
+
     carrier.type = 'sine';
     modulator.type = 'sine';
-    
+
     const carrierFreq = 400 + Math.random() * 200;
     carrier.frequency.setValueAtTime(carrierFreq, currentTime);
     modulator.frequency.setValueAtTime(carrierFreq * 3, currentTime);
-    
+
     const modGain = audioContext.createGain();
     modGain.gain.setValueAtTime(50, currentTime);
     modGain.gain.exponentialRampToValueAtTime(5, currentTime + 0.2);
-    
+
     const clickGain = audioContext.createGain();
     clickGain.gain.setValueAtTime(0.03, currentTime);
     clickGain.gain.exponentialRampToValueAtTime(0.001, currentTime + 1.5);
-    
+
     modulator.connect(modGain);
     modGain.connect(carrier.frequency);
     carrier.connect(clickGain);
     clickGain.connect(reverb);
     clickGain.connect(delay);
-    
+
     carrier.start();
     modulator.start();
     carrier.stop(currentTime + 1.5);
@@ -323,17 +323,17 @@ const playClickSound = () => {
 
 const playHoverSound = () => {
     if (!isAudioInitialized) return;
-    
+
     const currentTime = audioContext.currentTime;
-    
+
     const hover = audioContext.createOscillator();
     hover.type = 'sine';
     hover.frequency.setValueAtTime(800 + Math.random() * 400, currentTime);
-    
+
     const hoverGain = audioContext.createGain();
     hoverGain.gain.setValueAtTime(0.01, currentTime);
     hoverGain.gain.exponentialRampToValueAtTime(0.001, currentTime + 1.2);
-    
+
     hover.connect(hoverGain);
     hoverGain.connect(reverb);
     hover.start();
@@ -342,18 +342,18 @@ const playHoverSound = () => {
 
 const playMorphSound = () => {
     if (!isAudioInitialized) return;
-    
+
     const currentTime = audioContext.currentTime;
-    
+
     const morph = audioContext.createOscillator();
     morph.type = 'triangle';
     morph.frequency.setValueAtTime(150, currentTime);
     morph.frequency.exponentialRampToValueAtTime(300, currentTime + 1.0);
-    
+
     const morphGain = audioContext.createGain();
     morphGain.gain.setValueAtTime(0.02, currentTime);
     morphGain.gain.exponentialRampToValueAtTime(0.001, currentTime + 1.2);
-    
+
     morph.connect(morphGain);
     morphGain.connect(delay);
     morph.start();
@@ -368,7 +368,7 @@ export const updateProjects = (musicProjects, programmingProjects) => {
     while (projectPoints.children.length > 0) {
         projectPoints.remove(projectPoints.children[0]);
     }
-    
+
     // Combine all projects and add IDs
     allProjects = [
         ...musicProjects.map((project, index) => ({
@@ -384,21 +384,21 @@ export const updateProjects = (musicProjects, programmingProjects) => {
             id: `programming-${index}`
         }))
     ];
-    
+
     // Create points for each project
     allProjects.forEach((project, globalIndex) => {
         const goldenAngle = Math.PI * (3 - Math.sqrt(5));
         const y = 1 - (globalIndex / (allProjects.length - 1)) * 2;
         const radius = Math.sqrt(1 - y * y);
         const theta = goldenAngle * globalIndex;
-        
+
         const pointMesh = createDestructiblePoint(project, {
             phi: Math.acos(y),
             theta: theta
         });
         projectPoints.add(pointMesh);
     });
-    
+
     // Collect interaction spheres for raycasting
     interactionObjects = projectPoints.children.map(group => group.children.find(child => child instanceof THREE.Mesh));
 };
@@ -408,34 +408,34 @@ export const updateProjects = (musicProjects, programmingProjects) => {
  */
 const createDestructiblePoint = (project, position) => {
     const pointGroup = new THREE.Group();
-    
+
     // Particle system
     const particleCount = 5;
     const particles = new THREE.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
     const colors = new Float32Array(particleCount * 3);
     const sizes = new Float32Array(particleCount);
-    
+
     for (let i = 0; i < particleCount; i++) {
         const phi = Math.random() * Math.PI * 2;
         const theta = Math.random() * Math.PI;
         const radius = 0.005 + Math.random() * 0.01;
-        
+
         positions[i * 3] = radius * Math.sin(theta) * Math.cos(phi);
         positions[i * 3 + 1] = radius * Math.sin(theta) * Math.sin(phi);
         positions[i * 3 + 2] = radius * Math.cos(theta);
-        
+
         colors[i * 3] = 1.0;
         colors[i * 3 + 1] = 0.0 + Math.random() * 0.2;
         colors[i * 3 + 2] = 0.5 + Math.random() * 0.3;
-        
+
         sizes[i] = 1 + Math.random() * 1.2;
     }
-    
+
     particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     particles.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     particles.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
-    
+
     const particleMaterial = new THREE.ShaderMaterial({
         uniforms: {
             time: { value: 0 },
@@ -490,23 +490,23 @@ const createDestructiblePoint = (project, position) => {
         depthTest: false,
         blending: THREE.AdditiveBlending
     });
-    
+
     const particleSystem = new THREE.Points(particles, particleMaterial);
     pointGroup.add(particleSystem);
-    
+
     // Add interaction sphere for raycasting
     const interactionSphere = new THREE.Mesh(
         new THREE.SphereGeometry(0.09, 8, 8), // był 0.05
         new THREE.MeshBasicMaterial({ visible: false })
     );
     pointGroup.add(interactionSphere);
-    
+
     // Position the group on the sphere
     const sphereRadius = 1.6;
     pointGroup.position.x = sphereRadius * Math.sin(position.phi) * Math.cos(position.theta);
     pointGroup.position.y = sphereRadius * Math.sin(position.phi) * Math.sin(position.theta);
     pointGroup.position.z = sphereRadius * Math.cos(position.phi);
-    
+
     // Store project data
     pointGroup.userData = {
         ...project,
@@ -518,16 +518,17 @@ const createDestructiblePoint = (project, position) => {
         isClicked: false,
         movementOffset: Math.random() * 2 * Math.PI
     };
-    
+
     return pointGroup;
 };
 
 // Variables for morphing logic
 let currentTextureIndex = 0;
 let morphing = false;
-let baseMorphSpeed = 0.000091;
+let morphProgress = 0; // New variable for smooth easing
+let baseMorphSpeed = 0.00005; // Decreased speed (was 0.00015)
 let morphSpeed = baseMorphSpeed;
-const morphDelay = 2000;
+const morphDelay = 4000; // Increased delay (was 1500)
 let lastMorphTime = 20;
 let scrollPosition = 0;
 let lastMorphSoundTime = 0;
@@ -545,35 +546,72 @@ const animate = async () => {
     requestAnimationFrame(animate);
 
     const now = performance.now();
-    
+
     // Update time uniform for sphere's noise animation
     SPHERE.material.uniforms.time.value = now * 0.00001;
 
     const uniforms = SPHERE.material.uniforms;
 
     // Handle morphing with scroll-based speed
-    if (!morphing && now - lastMorphTime > morphDelay) {
+    // Handle morphing with scroll-based speed
+    // Calculate dynamic delay based on current texture type
+    let currentDelay = morphDelay;
+    const currentTexture = texture[currentTextureIndex];
+    if (currentTexture && currentTexture.userData && currentTexture.userData.video) {
+        const video = currentTexture.userData.video;
+        if (video.duration) {
+            // Use video duration (in ms) minus a small buffer for transition
+            currentDelay = (video.duration * 1000) - 1000;
+        }
+    }
+
+    if (!morphing && now - lastMorphTime > currentDelay) {
         morphing = true;
+        morphProgress = 0; // Reset progress
         uniforms.tDiffuse1.value = texture[currentTextureIndex];
         currentTextureIndex = (currentTextureIndex + 1) % texture.length;
         uniforms.tDiffuse2.value = texture[currentTextureIndex];
-        uniforms.morphFactor.value = 0.5;
-        lastMorphTime = 20;
-        console.log(now - lastMorphSoundTime > morphDelay)
+        // uniforms.morphFactor.value = 0.5; // Removed initial jump
+        lastMorphTime = now; // Reset time to now, not constant
+
         // Play morph sound once per morph cycle
-       if (now - lastMorphSoundTime > morphDelay) {
+        if (now - lastMorphSoundTime > currentDelay) {
             audioSystem.playMorphSound(uniforms.morphFactor.value);
             lastMorphSoundTime = now;
         }
     }
 
     if (morphing) {
-        uniforms.morphFactor.value += morphSpeed;
-        if (uniforms.morphFactor.value >= 1.0) {
-            uniforms.morphFactor.value = 1.0;
+        morphProgress += morphSpeed * 100.0; // Adjust speed scale for progress (0-1)
+
+        if (morphProgress >= 1.0) {
+            morphProgress = 1.0;
             morphing = false;
         }
+
+        // SmoothStep easing: t * t * (3 - 2 * t)
+        const smoothed = morphProgress * morphProgress * (3.0 - 2.0 * morphProgress);
+        uniforms.morphFactor.value = smoothed;
     }
+
+    // --- Audio Logic ---
+    if (audioSystem.isInitialized) {
+        // Background Cinema Audio
+        if (cinemaVideo) {
+            cinemaVideo.muted = false;
+            // Smooth fade in if needed, or just set volume
+            if (cinemaVideo.volume < 0.8) {
+                cinemaVideo.volume += 0.01;
+            }
+            if (cinemaVideo.paused) cinemaVideo.play().catch(() => { });
+        }
+    } else {
+        // Ensure video stays muted if audio not initialized
+        if (cinemaVideo) {
+            cinemaVideo.muted = true;
+        }
+    }
+    // -------------------
 
     // Apply drag-based rotation with smooth interpolation
     if (!isDragging) {
@@ -584,21 +622,21 @@ const animate = async () => {
     // Apply rotation to sphere and project points
     const autoRotationX = now * 0.00019;
     const autoRotationY = now * 0.00019;
-    
+
     SPHERE.rotation.x = sphereRotation.x + autoRotationX;
     SPHERE.rotation.y = sphereRotation.y + autoRotationY;
     projectPoints.rotation.x = sphereRotation.x + autoRotationX;
     projectPoints.rotation.y = sphereRotation.y + autoRotationY;
 
-    z = scrollPosition/60+2;
-    m = scrollPosition/5929+0.01;
-    n = z-2;
-     
+    z = scrollPosition / 60 + 2;
+    m = scrollPosition / 5929 + 0.01;
+    n = z - 2;
+
     // Update particle animations
     projectPoints.children.forEach(pointGroup => {
         const userData = pointGroup.userData;
         const material = userData.particleMaterial;
-        
+
         // Slow breathing movement for each point
         const timeFactor = (now * 0.0005) + userData.movementOffset;
         const movementScale = 0.05 * Math.sin(timeFactor);
@@ -607,7 +645,7 @@ const animate = async () => {
 
         if (material && material.uniforms) {
             material.uniforms.time.value = now * 0.00001;
-            
+
             // Hover animation
             if (userData.isHovered && userData.hoverFactor < 1.0) {
                 userData.hoverFactor += 0.1;
@@ -615,12 +653,12 @@ const animate = async () => {
                 userData.hoverFactor -= 0.1;
             }
             material.uniforms.hoverFactor.value = userData.hoverFactor;
-            
+
             // Click destruction
             if (userData.isClicked && userData.destructionFactor < 3.0) {
                 userData.destructionFactor += 0.1;
             }
-            
+
             material.uniforms.destructionFactor.value = userData.destructionFactor;
         }
     });
@@ -636,21 +674,21 @@ export const resize = async () => {
         Renderer.setSize(window.innerWidth, window.innerHeight);
         CAMERA.aspect = window.innerWidth / window.innerHeight;
         CAMERA.updateProjectionMatrix();
-        
+
     }
 };
 
 // Mouse event handlers with safety checks
 const onMouseDown = (event) => {
     if (!event) return;
-    
+
     console.log('Mouse down detected at:', event.clientX, event.clientY);
-    
+
     // Initialize audio on first user interaction
     if (!audioSystem.isInitialized) {
         audioSystem.init();
     }
-    
+
     isDragging = true;
     hasMovedWhileDragging = false;
     dragStartTime = performance.now();
@@ -658,16 +696,16 @@ const onMouseDown = (event) => {
         x: event.clientX,
         y: event.clientY
     };
-    
+
     document.body.style.cursor = 'grabbing';
-    
+
     if (event.preventDefault) event.preventDefault();
     if (event.stopPropagation) event.stopPropagation();
 };
 
 const onMouseMove = (event) => {
     if (!event) return;
-    
+
     // Update mouse position for raycasting
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -677,16 +715,16 @@ const onMouseMove = (event) => {
             x: event.clientX - previousMousePosition.x,
             y: event.clientY - previousMousePosition.y
         };
-        
+
         if (Math.abs(deltaMove.x) > 1 || Math.abs(deltaMove.y) > 1) {
             hasMovedWhileDragging = true;
             console.log('Dragging with delta:', deltaMove.x, deltaMove.y);
-            
+
             // Play drag sound occasionally
             if (Math.random() < 0.58) {
                 audioSystem.playDragSound();
             }
-            
+
             // Update rotation
             targetRotation.y += deltaMove.x * rotationSpeed;
             targetRotation.x -= deltaMove.y * rotationSpeed;
@@ -698,7 +736,7 @@ const onMouseMove = (event) => {
                 y: event.clientY
             };
         }
-        
+
         if (event.preventDefault) event.preventDefault();
         if (event.stopPropagation) event.stopPropagation();
     } else {
@@ -717,7 +755,7 @@ const onMouseMove = (event) => {
 
                 INTERSECTED = pointGroup;
                 INTERSECTED.userData.isHovered = true;
-                
+
                 // Play hover sound occasionally
                 if (Math.random() < 0.3) {
                     audioSystem.playHoverSound();
@@ -729,22 +767,22 @@ const onMouseMove = (event) => {
                 INTERSECTED = null;
             }
         }
-        
+
         document.body.style.cursor = intersects.length > 0 ? 'pointer' : 'grab';
     }
 };
 
 const onMouseUp = (event) => {
     console.log('Mouse up detected, was dragging:', isDragging, 'moved while dragging:', hasMovedWhileDragging);
-    
+
     const dragDuration = performance.now() - dragStartTime;
     const wasDragging = isDragging && (dragDuration > 100 || hasMovedWhileDragging);
-    
+
     isDragging = false;
     hasMovedWhileDragging = false;
-    
+
     document.body.style.cursor = 'grab';
-    
+
     if (!wasDragging) {
         handleProjectClick(event);
     }
@@ -752,7 +790,7 @@ const onMouseUp = (event) => {
 
 const handleProjectClick = (event) => {
     if (!event) return;
-    
+
     // Re-calculate mouse position for accurate raycasting
     const rect = Renderer.domElement.getBoundingClientRect();
     mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -768,24 +806,24 @@ const handleProjectClick = (event) => {
         // Play click sound
         audioSystem.playClickSound();
         console.log('Project clicked:', project.id);
-        
-        
-        
+
+
+
         // Mark as clicked and start permanent destruction
         if (!clickedGroup.userData.isClicked) {
             clickedGroup.userData.isClicked = true;
             clickedGroup.userData.isHovered = false;
         }
-        
+
         // Scroll to the project section
         const projectElement = document.getElementById(project.id);
         if (projectElement) {
             console.log('Scrolling to project:', project.id);
-            projectElement.scrollIntoView({ 
-                behavior: 'smooth', 
-                block: 'center' 
+            projectElement.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center'
             });
-            
+
             // Add highlight effect
             projectElement.style.transform = 'scale(1.02)';
             projectElement.style.transition = 'transform 0.5s ease';
@@ -828,31 +866,93 @@ const onTouchEnd = (event) => {
     });
 };
 
+/**
+ * Creates a video texture from a file
+ */
+const createVideoTexture = (videoFilename) => {
+    // 1. Create HTML Video Element (In-Memory)
+    const video = document.createElement('video');
+    video.src = `${base}/${videoFilename}`; // Uses SvelteKit base path
+    video.crossOrigin = 'anonymous';
+    video.loop = true;
+    video.muted = true; // Required for autoplay
+    video.playsInline = true;
+
+    video.play().catch(e => console.error('Video play failed:', e));
+
+
+    // 2. Create Video Texture
+    const videoTexture = new THREE.VideoTexture(video);
+    videoTexture.colorSpace = THREE.SRGBColorSpace; // Modern Three.js color fix
+    videoTexture.minFilter = THREE.LinearFilter;
+    videoTexture.magFilter = THREE.LinearFilter;
+
+    // Store video element in userData for audio control
+    videoTexture.userData = { video: video };
+
+    return videoTexture;
+};
+
+/**
+ * Creates a fullscreen CSS background video
+ */
+const createCinemaBackground = (videoFilename) => {
+    // 1. Create Video Element (reusing helper, but we don't need the texture)
+    const video = document.createElement('video');
+    video.src = `${base}/${videoFilename}`;
+    video.loop = true;
+    video.muted = true;
+    video.playsInline = true;
+    video.crossOrigin = 'anonymous';
+
+    // 2. Style as Fullscreen Background
+    video.style.position = 'fixed';
+    video.style.top = '0';
+    video.style.left = '0';
+    video.style.width = '100%';
+    video.style.height = '100%';
+    video.style.objectFit = 'cover';
+    video.style.zIndex = '-1'; // Behind canvas
+    document.body.appendChild(video);
+
+    video.play().catch(e => console.error('Video play failed:', e));
+
+    return video;
+};
+
 export const setScene = async (canvas) => {
-    Renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
-    Renderer.setClearColor("#000000");
-    
+    Renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+    Renderer.setClearColor(0x000000, 0); // Transparent background
+
+    // --- Background Cinema Setup ---
+    // Make sure 'demo.mp4' exists in your 'static' folder!
+    // cinemaVideo = createCinemaBackground('demo.mp4');
+    // -------------------------------
+
+    // Reset sphere to initial image texture
+    SPHERE.material.uniforms.tDiffuse1.value = texture[0];
+
     canvas.style.cursor = 'grab';
-    
+
     // Add event listeners
     window.addEventListener('resize', resize);
-    
+
     canvas.addEventListener('mousedown', onMouseDown, { passive: false });
     document.addEventListener('mousemove', onMouseMove, { passive: false });
     document.addEventListener('mouseup', onMouseUp, { passive: false });
-    
+
     // Touch events
     canvas.addEventListener('touchstart', onTouchStart, { passive: false });
     canvas.addEventListener('touchmove', onTouchMove, { passive: false });
     canvas.addEventListener('touchend', onTouchEnd, { passive: false });
-    
+
     // Test event binding
     canvas.addEventListener('mouseenter', () => {
         console.log('Mouse entered canvas - events are working!');
     });
-    
+
     console.log('Scene initialized with drag controls');
-    
+
     await resize();
     await animate();
 };

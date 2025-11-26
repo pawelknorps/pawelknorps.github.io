@@ -5,6 +5,7 @@
 		setScene,
 		updateProjects,
 		setAudioSystem,
+		focusProject,
 	} from "$lib/ThreeObject.js";
 	import { fade } from "svelte/transition";
 	import { onMount, tick } from "svelte";
@@ -15,6 +16,7 @@
 	import SocialBubbles from "$lib/components/SocialBubbles.svelte";
 	import ProjectsSection from "$lib/components/ProjectsSection.svelte";
 	import BiographicalSection from "$lib/components/BiographicalSection.svelte";
+	import AudioControls from "$lib/components/AudioControls.svelte";
 
 	// Import audio system
 	import { audioSystem } from "$lib/AudioSystem.js";
@@ -338,6 +340,7 @@
 	</div>
 {/if}
 
+<AudioControls />
 <SocialBubbles />
 
 <!-- Seamless flowing content -->
@@ -359,6 +362,10 @@
 					{programmingProjects}
 					{adaptiveTextClass}
 					{adaptiveSubTextClass}
+					on:projectFocus={(e) => {
+						console.log("Page received projectFocus:", e.detail.id);
+						focusProject(e.detail.id);
+					}}
 				/>
 			</div>
 

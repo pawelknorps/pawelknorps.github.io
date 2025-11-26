@@ -1,10 +1,54 @@
 <script>
 	import { fade } from "svelte/transition";
+	import { createEventDispatcher, onMount } from "svelte";
 
 	export let musicProjects;
 	export let programmingProjects;
 	export let adaptiveTextClass;
 	export let adaptiveSubTextClass;
+
+	const dispatch = createEventDispatcher();
+	let observer;
+
+	onMount(async () => {
+		// Wait for DOM updates
+		await new Promise((r) => setTimeout(r, 100));
+
+		const options = {
+			root: null,
+			rootMargin: "-10% 0px -10% 0px", // Much wider area (80% of screen height)
+			threshold: [0, 0.1],
+		};
+
+		observer = new IntersectionObserver((entries) => {
+			entries.forEach((entry) => {
+				// console.log("Entry:", entry.target.id, entry.isIntersecting); // Super verbose log
+				if (entry.isIntersecting) {
+					const id = entry.target.id;
+					console.log("Intersection detected:", id);
+					if (id) {
+						const [type, index] = id.split("-");
+						dispatch("projectFocus", {
+							type,
+							index: parseInt(index),
+							id,
+						});
+					}
+				}
+			});
+		}, options);
+
+		const cards = document.querySelectorAll(".project-card");
+		console.log("Found project cards to observe:", cards.length);
+
+		cards.forEach((card) => {
+			observer.observe(card);
+		});
+
+		return () => {
+			if (observer) observer.disconnect();
+		};
+	});
 </script>
 
 <!-- Music Projects -->
@@ -511,13 +555,17 @@
 
 	/* Project card highlight animation */
 	.project-card {
-		transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-		border-radius: 10px;
-		padding: 0.8rem;
+		transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+		border-radius: 16px;
+		padding: 1.5rem;
 		position: relative;
-		backdrop-filter: blur(2px);
-		background: rgba(0, 0, 0, 0.15);
-		border: 1px solid rgba(255, 255, 255, 0.1);
+		backdrop-filter: blur(12px);
+		-webkit-backdrop-filter: blur(12px);
+		background: rgba(20, 20, 20, 0.4);
+		border: 1px solid rgba(255, 255, 255, 0.08);
+		box-shadow:
+			0 4px 24px -1px rgba(0, 0, 0, 0.2),
+			0 0 0 1px rgba(255, 255, 255, 0.02) inset;
 	}
 
 	.project-card::before {
@@ -527,11 +575,23 @@
 		left: 0;
 		right: 0;
 		bottom: 0;
-		background: linear-gradient(45deg, rgba(255, 0, 128, 0.1), transparent);
-		border-radius: 12px;
+		background: linear-gradient(
+			135deg,
+			rgba(255, 0, 128, 0.15),
+			rgba(255, 255, 255, 0.05)
+		);
+		border-radius: 16px;
 		opacity: 0;
-		transition: opacity 0.3s ease;
+		transition: opacity 0.4s ease;
 		z-index: -1;
+		pointer-events: none;
+	}
+
+	.project-card:hover {
+		border-color: rgba(255, 255, 255, 0.2);
+		box-shadow:
+			0 20px 40px -5px rgba(0, 0, 0, 0.4),
+			0 0 0 1px rgba(255, 255, 255, 0.1) inset;
 	}
 
 	.project-card:hover::before {
@@ -540,9 +600,10 @@
 
 	/* Subtle hover effects for tags */
 	.project-group span:hover {
-		background: rgba(255, 0, 128, 0.1);
+		background: rgba(255, 0, 128, 0.2);
 		border-color: rgba(255, 0, 128, 0.8);
 		color: white;
+		box-shadow: 0 0 15px rgba(255, 0, 128, 0.4);
 	}
 
 	/* Adaptive text colors with smooth transitions */
@@ -553,14 +614,14 @@
 
 	.adaptive-text {
 		text-shadow:
-			0 0 10px rgba(0, 0, 0, 0.8),
-			0 2px 4px rgba(0, 0, 0, 0.6),
-			0 1px 2px rgba(0, 0, 0, 0.9);
+			0 0 20px rgba(0, 0, 0, 0.5),
+			0 2px 4px rgba(0, 0, 0, 0.3);
+		letter-spacing: -0.02em;
 	}
 
 	.adaptive-subtext {
 		text-shadow:
-			0 0 8px rgba(0, 0, 0, 0.7),
-			0 1px 3px rgba(0, 0, 0, 0.5);
+			0 0 10px rgba(0, 0, 0, 0.5),
+			0 1px 2px rgba(0, 0, 0, 0.3);
 	}
 </style>

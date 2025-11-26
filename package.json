@@ -21,6 +21,7 @@
 	},
 	"type": "module",
 	"dependencies": {
+		"@rnbo/js": "^1.4.2",
 		"gh-pages": "^4.0.0",
 		"simplenoise": "^1.0.1",
 		"three": "^0.124.0"

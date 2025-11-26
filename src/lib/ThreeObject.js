@@ -26,101 +26,47 @@ let isDragging = false;
 let previousMousePosition = { x: 0, y: 0 };
 let sphereRotation = { x: 0, y: 0 };
 let targetRotation = { x: 0, y: 0 };
-const rotationSpeed = 0.008;
-const dampingFactor = 0.05;
+const rotationSpeed = 0.002; // Reduced from 0.008
+const dampingFactor = 0.03; // Reduced from 0.05
 let dragStartTime = 0;
 let hasMovedWhileDragging = false;
 
-// Custom ShaderMaterial for morphing with Perlin noise in vertex shader
+// Custom ShaderMaterial for morphing with wave-based texture distortion
 const morphShader = {
     uniforms: {
         tDiffuse1: { value: texture[0] },
         tDiffuse2: { value: texture[1] },
         morphFactor: { value: n },
-        time: { value: 0 }
+        time: { value: 0 },
+        uAudioLow: { value: 0 },
+        uAudioMid: { value: 0 },
+        uAudioHigh: { value: 0 }
     },
     vertexShader: `
-        // Classic Perlin 3D Noise by Stefan Gustavson
-        vec4 permute(vec4 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
-        vec4 taylorInvSqrt(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
-        vec3 fade(vec3 t) { return t*t*t*(t*(t*6.0-15.0)+10.0); }
-
-        float cnoise(vec3 P) {
-            vec3 Pi0 = floor(P);
-            vec3 Pi1 = Pi0 + vec3(1.0);
-            Pi0 = mod(Pi0, 289.0);
-            Pi1 = mod(Pi1, 289.0);
-            vec3 Pf0 = fract(P);
-            vec3 Pf1 = Pf0 - vec3(1.0);
-            vec4 ix = vec4(Pi0.x, Pi1.x, Pi0.x, Pi1.x);
-            vec4 iy = vec4(Pi0.yy, Pi1.yy);
-            vec4 iz0 = Pi0.zzzz;
-            vec4 iz1 = Pi1.zzzz;
-
-            vec4 ixy = permute(permute(ix) + iy);
-            vec4 ixy0 = permute(ixy + iz0);
-            vec4 ixy1 = permute(ixy + iz1);
-
-            vec4 gx0 = ixy0 / 7.0;
-            vec4 gy0 = fract(floor(gx0) / 7.0) - 0.5;
-            gx0 = fract(gx0);
-            vec4 gz0 = vec4(0.5) - abs(gx0) - abs(gy0);
-            vec4 sz0 = step(gz0, vec4(0.0));
-            gx0 -= sz0 * (step(0.0, gx0) - 0.5);
-            gy0 -= sz0 * (step(0.0, gy0) - 0.5);
-
-            vec4 gx1 = ixy1 / 7.0;
-            vec4 gy1 = fract(floor(gx1) / 7.0) - 0.5;
-            gx1 = fract(gx1);
-            vec4 gz1 = vec4(0.5) - abs(gx1) - abs(gy1);
-            vec4 sz1 = step(gz1, vec4(0.0));
-            gx1 -= sz1 * (step(0.0, gx1) - 0.5);
-            gy1 -= sz1 * (step(0.0, gy1) - 0.5);
-
-            vec3 g000 = vec3(gx0.x, gy0.x, gz0.x);
-            vec3 g100 = vec3(gx0.y, gy0.y, gz0.y);
-            vec3 g010 = vec3(gx0.z, gy0.z, gz0.z);
-            vec3 g110 = vec3(gx0.w, gy0.w, gz0.w);
-            vec3 g001 = vec3(gx1.x, gy1.x, gz1.x);
-            vec3 g101 = vec3(gx1.y, gy1.y, gz1.y);
-            vec3 g011 = vec3(gx1.z, gy1.z, gz1.z);
-            vec3 g111 = vec3(gx1.w, gy1.w, gz1.w);
-
-            vec4 norm0 = taylorInvSqrt(vec4(dot(g000, g000), dot(g010, g010), dot(g100, g100), dot(g110, g110)));
-            g000 *= norm0.x;
-            g010 *= norm0.y;
-            g100 *= norm0.z;
-            g110 *= norm0.w;
-            vec4 norm1 = taylorInvSqrt(vec4(dot(g001, g001), dot(g011, g011), dot(g101, g101), dot(g111, g111)));
-            g001 *= norm1.x;
-            g011 *= norm1.y;
-            g101 *= norm1.z;
-            g111 *= norm1.w;
-
-            float n000 = dot(g000, Pf0);
-            float n100 = dot(g100, vec3(Pf1.x, Pf0.yz));
-            float n010 = dot(g010, vec3(Pf0.x, Pf1.y, Pf0.z));
-            float n110 = dot(g110, vec3(Pf1.xy, Pf0.z));
-            float n001 = dot(g001, vec3(Pf0.xy, Pf1.z));
-            float n101 = dot(g101, vec3(Pf1.x, Pf0.y, Pf1.z));
-            float n011 = dot(g011, vec3(Pf0.x, Pf1.yz));
-            float n111 = dot(g111, Pf1);
-
-            vec3 fade_xyz = fade(Pf0);
-            vec4 n_z = mix(vec4(n000, n100, n010, n110), vec4(n001, n101, n011, n111), fade_xyz.z);
-            vec2 n_yz = mix(n_z.xy, n_z.zw, fade_xyz.y);
-            float n_xyz = mix(n_yz.x, n_yz.y, fade_xyz.x);
-            return 2.2 * n_xyz;
-        }
-
         uniform float time;
+        uniform float uAudioLow;
+        uniform float uAudioMid;
+        uniform float uAudioHigh;
         varying vec2 vUv;
+        varying float vDisplacement;
 
         void main() {
             vUv = uv;
             vec3 pos = position;
-            float noiseValue = cnoise(vec3(pos.x + time, pos.y, pos.z));
-            pos = pos * (1.0 + noiseValue);
+            
+            // Rhythmic wave displacement
+            // Create a standing wave pattern that reacts to bass
+            float wave = sin(pos.y * 5.0 + time * 2.0) * cos(pos.x * 5.0 + time) * 0.1;
+            float bassWave = sin(pos.z * 10.0 + time * 5.0) * uAudioLow * 0.8; // Boosted from 0.2
+            
+            // High frequency jitter
+            float jitter = sin(time * 20.0 + pos.x * 20.0) * uAudioHigh * 0.2; // Boosted from 0.05
+            
+            float totalDisplacement = wave + bassWave + jitter;
+            vDisplacement = totalDisplacement;
+            
+            pos = pos + normal * totalDisplacement;
+            
             gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
         }
     `,
@@ -128,13 +74,41 @@ const morphShader = {
         uniform sampler2D tDiffuse1;
         uniform sampler2D tDiffuse2;
         uniform float morphFactor;
+        uniform float time;
+        uniform float uAudioLow;
+        uniform float uAudioHigh;
         varying vec2 vUv;
+        varying float vDisplacement;
 
         void main() {
-            vec2 shiftedUv = vUv; // Removed offset for correct video projection
-            vec4 color1 = texture2D(tDiffuse1, shiftedUv);
-            vec4 color2 = texture2D(tDiffuse2, shiftedUv);
-            gl_FragColor = mix(color1, color2, morphFactor);
+            vec2 uv = vUv;
+            
+            // Ripple effect on texture coordinates
+            // Create concentric ripples based on audio energy
+            float dist = length(uv - 0.5);
+            float ripple = sin(dist * 20.0 - time * 5.0) * uAudioLow * 0.2; // Boosted from 0.05
+            uv += ripple;
+            
+            // Chromatic aberration based on high frequencies
+            float aberration = uAudioHigh * 0.05; // Boosted from 0.02
+            
+            vec4 color1_r = texture2D(tDiffuse1, uv + vec2(aberration, 0.0));
+            vec4 color1_g = texture2D(tDiffuse1, uv);
+            vec4 color1_b = texture2D(tDiffuse1, uv - vec2(aberration, 0.0));
+            vec4 color1 = vec4(color1_r.r, color1_g.g, color1_b.b, 1.0);
+            
+            vec4 color2_r = texture2D(tDiffuse2, uv + vec2(aberration, 0.0));
+            vec4 color2_g = texture2D(tDiffuse2, uv);
+            vec4 color2_b = texture2D(tDiffuse2, uv - vec2(aberration, 0.0));
+            vec4 color2 = vec4(color2_r.r, color2_g.g, color2_b.b, 1.0);
+            
+            vec4 mixedColor = mix(color1, color2, morphFactor);
+            
+            // Highlight peaks of the waves
+            float highlight = smoothstep(0.05, 0.1, vDisplacement) * 0.2;
+            mixedColor.rgb += highlight;
+            
+            gl_FragColor = mixedColor;
         }
     `
 };
@@ -403,6 +377,70 @@ export const updateProjects = (musicProjects, programmingProjects) => {
     interactionObjects = projectPoints.children.map(group => group.children.find(child => child instanceof THREE.Mesh));
 };
 
+let currentFocusedId = null;
+
+/**
+ * Focuses on a specific project by ID.
+ * Rotates the sphere and triggers visual effects.
+ */
+export const focusProject = (id) => {
+    // console.log("focusProject called with:", id);
+
+    // Always find the group to ensure it exists
+    const pointGroup = projectPoints.children.find(p => p.userData.id === id);
+
+    if (pointGroup) {
+        // Reset hover state for all points
+        projectPoints.children.forEach(p => {
+            if (p !== pointGroup) {
+                p.userData.isHovered = false;
+            }
+        });
+
+        // Highlight the focused point
+        pointGroup.userData.isHovered = true;
+
+        // Trigger morph effect
+        const now = performance.now();
+        if (!morphing || (now - lastMorphTime > 1000)) {
+            morphing = true;
+            morphProgress = 0;
+            lastMorphTime = now;
+
+            const uniforms = SPHERE.material.uniforms;
+            uniforms.tDiffuse1.value = texture[currentTextureIndex];
+            currentTextureIndex = (currentTextureIndex + 1) % texture.length;
+            uniforms.tDiffuse2.value = texture[currentTextureIndex];
+
+            // Audio removed from scroll interaction per user request
+        }
+
+        // Calculate target rotation to bring point to front (0, 0, r)
+        const p = pointGroup.userData.originalPosition;
+
+        // Calculate the rotation needed to bring p to (0, 0, r)
+        // angle = atan2(x, z) is the angle of the point. We want to rotate by -angle.
+        const targetY = -Math.atan2(p.x, p.z);
+
+        // Rotation X (around horizontal axis) handles Y/Z plane
+        const zProjected = Math.sqrt(p.x * p.x + p.z * p.z);
+        const targetX = Math.atan2(p.y, zProjected);
+
+        // Compensate for auto-rotation
+        const autoRotationX = now * 0.00019;
+        const autoRotationY = now * 0.00019;
+
+        // Apply rotation
+        targetRotation.y = targetY - autoRotationY;
+        targetRotation.x = targetX - autoRotationX;
+
+        // Force a small "kick" to ensure the loop wakes up if it was sleeping (though it shouldn't be)
+        // and to make the movement feel more "active"
+        sphereRotation.x += (targetRotation.x - sphereRotation.x) * 0.02; // Reduced from 0.1
+        sphereRotation.y += (targetRotation.y - sphereRotation.y) * 0.02; // Reduced from 0.1
+    }
+};
+
 /**
  * Creates a destructible point group with particles and interaction sphere.
  */
@@ -526,7 +564,7 @@ const createDestructiblePoint = (project, position) => {
 let currentTextureIndex = 0;
 let morphing = false;
 let morphProgress = 0; // New variable for smooth easing
-let baseMorphSpeed = 0.00005; // Decreased speed (was 0.00015)
+let baseMorphSpeed = 0.00001; // Reduced from 0.00005
 let morphSpeed = baseMorphSpeed;
 const morphDelay = 4000; // Increased delay (was 1500)
 let lastMorphTime = 20;
@@ -550,9 +588,21 @@ const animate = async () => {
     // Update time uniform for sphere's noise animation
     SPHERE.material.uniforms.time.value = now * 0.00001;
 
+    // Update Audio Uniforms
+    if (audioSystem && audioSystem.isInitialized) {
+        const analysis = audioSystem.getAnalysis();
+
+        // Smooth interpolation (Lerp)
+        const lerp = (start, end, factor) => start + (end - start) * factor;
+        const smoothFactor = 0.1; // Lower = smoother
+
+        SPHERE.material.uniforms.uAudioLow.value = lerp(SPHERE.material.uniforms.uAudioLow.value, analysis.low, smoothFactor);
+        SPHERE.material.uniforms.uAudioMid.value = lerp(SPHERE.material.uniforms.uAudioMid.value, analysis.mid, smoothFactor);
+        SPHERE.material.uniforms.uAudioHigh.value = lerp(SPHERE.material.uniforms.uAudioHigh.value, analysis.high, smoothFactor);
+    }
+
     const uniforms = SPHERE.material.uniforms;
 
-    // Handle morphing with scroll-based speed
     // Handle morphing with scroll-based speed
     // Calculate dynamic delay based on current texture type
     let currentDelay = morphDelay;
@@ -576,7 +626,11 @@ const animate = async () => {
 
         // Play morph sound once per morph cycle
         if (now - lastMorphSoundTime > currentDelay) {
-            audioSystem.playMorphSound(uniforms.morphFactor.value);
+            try {
+                audioSystem.playMorphSound(uniforms.morphFactor.value);
+            } catch (e) {
+                // Ignore audio errors
+            }
             lastMorphSoundTime = now;
         }
     }
@@ -692,6 +746,7 @@ const onMouseDown = (event) => {
     isDragging = true;
     hasMovedWhileDragging = false;
     dragStartTime = performance.now();
+    currentFocusedId = null; // Allow re-focusing after manual interaction
     previousMousePosition = {
         x: event.clientX,
         y: event.clientY

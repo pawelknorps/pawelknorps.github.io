@@ -138,7 +138,7 @@
 
 {#if visible}
     <div
-        class="audio-controls fixed right-8 top-1/2 transform -translate-y-1/2 z-[9999] flex flex-row gap-1 pointer-events-auto select-none p-3 backdrop-blur-md bg-black/20 rounded-xl border border-white/10"
+        class="audio-controls fixed bottom-4 left-1/2 transform -translate-x-1/2 md:right-8 md:top-1/2 md:bottom-auto md:left-auto md:translate-x-0 md:-translate-y-1/2 z-[9999] flex flex-row gap-1 pointer-events-auto select-none p-3 backdrop-blur-md bg-black/20 rounded-xl border border-white/10"
         in:fly={{ x: 50, duration: 1000 }}
         on:mousedown|stopPropagation
         on:mouseup|stopPropagation={onMouseUp}

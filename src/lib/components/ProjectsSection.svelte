@@ -104,7 +104,7 @@
 
 			<div
 				id="music-{i}"
-				class="group my-20 translate-y-0 hover:-translate-y-8 duration-[400ms] ease-in-out w-[20rem] md:w-[40rem] lg:w-[30rem] xl:w-[40rem] project-card pointer-events-auto"
+				class="group my-20 translate-y-0 hover:-translate-y-8 duration-[400ms] ease-in-out w-full md:w-[40rem] lg:w-[30rem] xl:w-[40rem] project-card pointer-events-auto"
 				in:fade={{ delay: 250 * i, duration: 1000 }}
 			>
 				{#if youtubeId}
@@ -454,7 +454,7 @@
 		{#each programmingProjects as data, i}
 			<div
 				id="programming-{i}"
-				class="group my-20 translate-y-0 hover:-translate-y-8 duration-[400ms] ease-in-out w-[20rem] md:w-[40rem] lg:w-[30rem] xl:w-[40rem] project-card pointer-events-auto"
+				class="group my-20 translate-y-0 hover:-translate-y-8 duration-[400ms] ease-in-out w-full md:w-[40rem] lg:w-[30rem] xl:w-[40rem] project-card pointer-events-auto"
 				in:fade={{
 					delay: 250 * (i + musicProjects.length),
 					duration: 1000,

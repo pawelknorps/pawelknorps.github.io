@@ -274,15 +274,30 @@
 		property="twitter:image"
 		content="https://pawelknorps.github.io/my-photo2.webp"
 	/>
+	<meta name="robots" content="max-image-preview:large" />
+	<meta
+		property="og:image"
+		content="https://pawelknorps.github.io/my-photo.webp"
+	/>
+	<meta property="og:image:width" content="1200" />
+	<meta property="og:image:height" content="1200" />
+	<meta property="og:type" content="profile" />
+
 	<script type="application/ld+json">
 		{
 			"@context": "https://schema.org",
-			"@type": "Person",
+			"@type": "MusicGroup",
 			"name": "Paweł Knorps",
 			"url": "https://pawelknorps.github.io/",
-			"jobTitle": ["Composer", "Guitarist", "Bassist", "Producer"],
+			"image": "https://pawelknorps.github.io/my-photo.webp",
 			"description": "Portfolio of Paweł Knorps, a composer, guitarist, bassist, producer.",
-			"image": "https://pawelknorps.github.io/my-photo2.webp"
+			"jobTitle": ["Composer", "Guitarist", "Bassist", "Producer"],
+			"sameAs": [
+				"https://www.instagram.com/pawelknorps",
+				"https://www.facebook.com/pawelknorps",
+				"https://soundcloud.com/pawelknorps",
+				"https://www.youtube.com/@pawelknorps"
+			]
 		}
 	</script>
 </svelte:head>
@@ -347,14 +362,14 @@
 <div class="seamless-flow">
 	<HeroSection {personalData} {adaptiveTextClass} {adaptiveSubTextClass} />
 	<!-- Projects naturally flowing from bottom of page with biographical text -->
-	<div class="projects-flow relative px-4 sm:px-6 md:px-8 xl:px-16 2xl:px-24">
+	<div class="projects-flow relative w-full px-4 md:px-8 xl:px-16 2xl:px-24">
 		<!-- Centered column on mobile, row on xl+ -->
 		<div
 			class="flex flex-col items-center xl:items-start xl:flex-row gap-16 2xl:gap-24"
 		>
 			<!-- Left side - Projects -->
 			<div
-				class="projects-container w-full max-w-3xl xl:max-w-none xl:w-1/2"
+				class="projects-container w-full max-w-full xl:max-w-none xl:w-1/2"
 				bind:clientHeight={projectsHeight}
 			>
 				<ProjectsSection
@@ -438,9 +453,6 @@
 
 	/* Responsive adjustments for mobile */
 	@media (max-width: 800px) {
-		.projects-container {
-			padding: 0 1rem;
-		}
 		canvas {
 			touch-action: pan-y;
 		}

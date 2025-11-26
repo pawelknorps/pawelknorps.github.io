@@ -156,6 +156,16 @@
             {isExpanded ? "Hide Audio" : "Audio Params"}
         </button>
 
+        <!-- Play Button -->
+        {#if isExpanded}
+            <button
+                class="bg-black/40 backdrop-blur-md text-white/80 border border-white/20 rounded-full px-4 py-2 text-xs font-bold tracking-widest hover:bg-white/10 hover:text-[#FF0080] transition-all uppercase mb-2"
+                on:click|stopPropagation={() => audioSystem.triggerTestNote()}
+            >
+                Play
+            </button>
+        {/if}
+
         <!-- Controls Container -->
         {#if isExpanded}
             <div

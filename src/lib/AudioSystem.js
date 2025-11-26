@@ -3,7 +3,7 @@
 
 import pkg from '@rnbo/js';
 const { createDevice } = pkg;
-import patcher from '$lib/pawel.export.json';
+import patcher from '$lib/rnbo/efxplussynth.json';
 
 class AudioSystem {
     constructor() {
@@ -43,6 +43,9 @@ class AudioSystem {
             this.analyser = this.audioContext.createAnalyser();
             this.analyser.fftSize = 256;
             this.analyser.smoothingTimeConstant = 0.9; // Smoother response
+
+            // Setup MIDI immediately (don't wait for RNBO to load)
+            this.setupMIDI();
 
             // Load RNBO Device
             await this.loadRNBOPatch();
@@ -125,6 +128,63 @@ class AudioSystem {
             this.masterGain.connect(this.analyser);
             this.analyser.connect(this.audioContext.destination);
         }
+    }
+
+    setupMIDI() {
+        console.log('Setting up MIDI...');
+        if (navigator.requestMIDIAccess) {
+            navigator.requestMIDIAccess().then(midiAccess => {
+                console.log('MIDI Access Granted');
+                // Log inputs
+                const inputs = Array.from(midiAccess.inputs.values());
+                console.log(`Found ${inputs.length} MIDI inputs:`, inputs.map(i => i.name));
+
+                for (let input of midiAccess.inputs.values()) {
+                    input.onmidimessage = this.handleMIDIMessage.bind(this);
+                }
+                midiAccess.onstatechange = (e) => {
+                    console.log('MIDI State Change:', e.port.name, e.port.state);
+                    if (e.port.type === 'input' && e.port.state === 'connected') {
+                        e.port.onmidimessage = this.handleMIDIMessage.bind(this);
+                    }
+                };
+            }, (err) => {
+                console.warn('Could not access your MIDI devices:', err);
+            });
+        } else {
+            console.warn('Web MIDI API not supported in this browser.');
+        }
+    }
+
+    handleMIDIMessage(message) {
+        if (!this.rnboDevice) return;
+
+        const [status, data1, data2] = message.data;
+        const command = status & 0xf0;
+        const channel = status & 0x0f;
+
+        // Forward MIDI to RNBO device
+        // RNBO expects a MIDI event object
+        const midiEvent = new pkg.MIDIEvent(this.audioContext.currentTime * 1000, 0, [status, data1, data2]);
+        this.rnboDevice.scheduleEvent(midiEvent);
+    }
+
+    triggerTestNote() {
+        if (!this.rnboDevice) return;
+
+        const noteOn = [144, 60, 100]; // Note On, Middle C, Velocity 100
+        const noteOff = [128, 60, 0];  // Note Off, Middle C, Velocity 0
+        const duration = 500; // ms
+
+        const now = this.audioContext.currentTime * 1000;
+
+        const noteOnEvent = new pkg.MIDIEvent(now, 0, noteOn);
+        const noteOffEvent = new pkg.MIDIEvent(now + duration, 0, noteOff);
+
+        this.rnboDevice.scheduleEvent(noteOnEvent);
+        this.rnboDevice.scheduleEvent(noteOffEvent);
+
+        console.log('Test note triggered');
     }
 
     /**

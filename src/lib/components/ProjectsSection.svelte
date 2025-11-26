@@ -54,10 +54,10 @@
 <!-- Music Projects -->
 {#if musicProjects.length > 0}
 	<div
-		class="project-group mb-32 w-full xl:flex xl:flex-col xl:items-start xl:w-[40rem]"
+		class="project-group mb-32 w-full xl:flex xl:flex-col xl:items-start xl:w-[48rem] 2xl:w-[56rem]"
 	>
 		<h3
-			class="text-3xl font-black tracking-widest mb-16 opacity-80 adaptive-text w-full xl:w-[40rem]"
+			class="text-3xl font-black tracking-widest mb-16 opacity-80 adaptive-text w-full xl:w-[48rem] 2xl:w-[56rem]"
 			class:text-white={adaptiveTextClass === "text-white"}
 			class:text-gray-900={adaptiveTextClass === "text-gray-900"}
 		>
@@ -104,7 +104,7 @@
 
 			<div
 				id="music-{i}"
-				class="group my-20 translate-y-0 hover:-translate-y-8 duration-[400ms] ease-in-out w-full md:w-[40rem] lg:w-[30rem] xl:w-[40rem] project-card pointer-events-auto"
+				class="group my-20 translate-y-0 hover:-translate-y-8 duration-[400ms] ease-in-out w-full md:w-[40rem] lg:w-[30rem] xl:w-[48rem] 2xl:w-[56rem] project-card pointer-events-auto"
 				in:fade={{ delay: 250 * i, duration: 1000 }}
 			>
 				{#if youtubeId}
@@ -442,10 +442,10 @@
 <!-- Programming Projects -->
 {#if programmingProjects.length > 0}
 	<div
-		class="project-group mb-32 w-full xl:flex xl:flex-col xl:items-start xl:w-[40rem]"
+		class="project-group mb-32 w-full xl:flex xl:flex-col xl:items-start xl:w-[48rem] 2xl:w-[56rem]"
 	>
 		<h3
-			class="text-3xl font-black tracking-widest mb-16 opacity-80 adaptive-text w-full xl:w-[40rem]"
+			class="text-3xl font-black tracking-widest mb-16 opacity-80 adaptive-text w-full xl:w-[48rem] 2xl:w-[56rem]"
 			class:text-white={adaptiveTextClass === "text-white"}
 			class:text-gray-900={adaptiveTextClass === "text-gray-900"}
 		>
@@ -454,7 +454,7 @@
 		{#each programmingProjects as data, i}
 			<div
 				id="programming-{i}"
-				class="group my-20 translate-y-0 hover:-translate-y-8 duration-[400ms] ease-in-out w-full md:w-[40rem] lg:w-[30rem] xl:w-[40rem] project-card pointer-events-auto"
+				class="group my-20 translate-y-0 hover:-translate-y-8 duration-[400ms] ease-in-out w-full md:w-[40rem] lg:w-[30rem] xl:w-[48rem] 2xl:w-[56rem] project-card pointer-events-auto"
 				in:fade={{
 					delay: 250 * (i + musicProjects.length),
 					duration: 1000,

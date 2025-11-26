@@ -892,13 +892,22 @@ const handleProjectClick = (event) => {
 };
 
 // Touch event handlers
+let touchStartX = 0;
+let touchStartY = 0;
+
 const onTouchStart = (event) => {
     if (!event || !event.touches) return;
     const touch = event.touches[0];
+    touchStartX = touch.clientX;
+    touchStartY = touch.clientY;
+
+    // Do NOT prevent default here to allow potential scrolling
+    // We only prevent default if we determine it's a horizontal drag in onTouchMove
+
     onMouseDown({
         clientX: touch.clientX,
         clientY: touch.clientY,
-        preventDefault: () => event.preventDefault(),
+        preventDefault: () => { }, // No-op for start
         stopPropagation: () => event.stopPropagation()
     });
 };
@@ -906,17 +915,27 @@ const onTouchStart = (event) => {
 const onTouchMove = (event) => {
     if (!event || !event.touches) return;
     const touch = event.touches[0];
+
+    const deltaX = touch.clientX - touchStartX;
+    const deltaY = touch.clientY - touchStartY;
+
+    // If movement is primarily horizontal, treat as rotation and block scroll
+    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+        if (event.cancelable) event.preventDefault();
+    }
+    // If movement is primarily vertical, let the browser scroll (do nothing)
+
     onMouseMove({
         clientX: touch.clientX,
         clientY: touch.clientY,
-        preventDefault: () => event.preventDefault(),
+        preventDefault: () => { }, // Handled above
         stopPropagation: () => event.stopPropagation()
     });
 };
 
 const onTouchEnd = (event) => {
     onMouseUp({
-        preventDefault: () => event && event.preventDefault ? event.preventDefault() : null,
+        preventDefault: () => { },
         stopPropagation: () => event && event.stopPropagation ? event.stopPropagation() : null
     });
 };

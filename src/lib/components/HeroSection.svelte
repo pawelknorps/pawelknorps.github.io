@@ -6,16 +6,16 @@
 
 <!-- Hero Section -->
 <div class="hero-section h-[75vh] flex flex-col justify-center relative">
-	<div class="group z-10">
+	<div class="group z-10 flex flex-col items-center md:items-start">
 		<h2
-			class="text-6xl font-black tracking-widest ml-20 adaptive-text"
+			class="text-6xl xl:text-7xl 2xl:text-8xl font-black tracking-widest text-center md:text-left md:ml-20 adaptive-text"
 			class:text-white={adaptiveTextClass === "text-white"}
 			class:text-gray-900={adaptiveTextClass === "text-gray-900"}
 		>
 			{personalData.name}
 		</h2>
 		<h2
-			class="text-2xl font-thin tracking-widest mt-6 ml-20 adaptive-text"
+			class="text-2xl xl:text-3xl 2xl:text-4xl font-thin tracking-widest mt-6 text-center md:text-left md:ml-20 adaptive-text"
 			class:text-white={adaptiveTextClass === "text-white"}
 			class:text-gray-900={adaptiveTextClass === "text-gray-900"}
 		>
@@ -27,7 +27,7 @@
 			>
 		</h2>
 		<h2
-			class="text-2xl font-thin tracking-widest mt-6 ml-20 adaptive-text"
+			class="text-2xl xl:text-3xl 2xl:text-4xl font-thin tracking-widest mt-6 text-center md:text-left md:ml-20 adaptive-text"
 			class:text-white={adaptiveTextClass === "text-white"}
 			class:text-gray-900={adaptiveTextClass === "text-gray-900"}
 		>

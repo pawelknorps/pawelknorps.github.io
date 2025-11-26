@@ -4,6 +4,7 @@
     import { fade, fly } from "svelte/transition";
 
     let visible = false;
+    let isExpanded = false; // Collapsed by default on mobile
 
     // Parameter values (defaults)
     let windowMs = 100;
@@ -138,7 +139,7 @@
 
 {#if visible}
     <div
-        class="audio-controls fixed bottom-4 left-1/2 transform -translate-x-1/2 md:right-8 md:top-1/2 md:bottom-auto md:left-auto md:translate-x-0 md:-translate-y-1/2 z-[9999] flex flex-row gap-1 pointer-events-auto select-none p-3 backdrop-blur-md bg-black/20 rounded-xl border border-white/10"
+        class="audio-controls fixed bottom-4 left-1/2 transform -translate-x-1/2 md:right-8 md:top-1/2 md:bottom-auto md:left-auto md:translate-x-0 md:-translate-y-1/2 z-[9999] flex flex-col items-end gap-2 pointer-events-auto select-none"
         in:fly={{ x: 50, duration: 1000 }}
         on:mousedown|stopPropagation
         on:mouseup|stopPropagation={onMouseUp}
@@ -147,30 +148,48 @@
         on:click|stopPropagation
         on:mousemove|stopPropagation
     >
-        <!-- Compact Slider Component -->
-        {#each [{ id: "window", label: "WIN", val: windowMs, min: 1, max: 1000 }, { id: "chorus", label: "CHO", val: chorus, min: 0, max: 100 }, { id: "delay", label: "DEL", val: delayMs, min: 0, max: 2000 }, { id: "feedback", label: "FDB", val: feedback, min: 0, max: 95 }, { id: "mix", label: "MIX", val: mix, min: 0, max: 100 }, { id: "pitchvol", label: "PVOL", val: pitchvol, min: 0, max: 100 }, { id: "revvol", label: "RVOL", val: revvol, min: 0, max: 100 }, { id: "octdamp", label: "ODMP", val: octdamp, min: 0, max: 100 }, { id: "octvol", label: "OVOL", val: octvol, min: 0, max: 100 }] as slider}
-            <div class="control-group group flex flex-col items-center w-5">
-                <div
-                    class="slider-container h-24 w-full bg-white/5 rounded-full relative cursor-pointer touch-none overflow-hidden group-hover:bg-white/10 transition-colors"
-                    on:mousedown={(e) =>
-                        startDrag(e, slider.id, slider.min, slider.max)}
-                    on:touchstart={(e) =>
-                        startDrag(e, slider.id, slider.min, slider.max)}
-                >
+        <!-- Toggle Button -->
+        <button
+            class="bg-black/40 backdrop-blur-md text-white/80 border border-white/20 rounded-full px-4 py-2 text-xs font-bold tracking-widest hover:bg-white/10 hover:text-white transition-all uppercase"
+            on:click={() => (isExpanded = !isExpanded)}
+        >
+            {isExpanded ? "Hide Audio" : "Audio Params"}
+        </button>
+
+        <!-- Controls Container -->
+        {#if isExpanded}
+            <div
+                class="flex flex-row gap-1 p-3 backdrop-blur-md bg-black/20 rounded-xl border border-white/10"
+                transition:fade={{ duration: 200 }}
+            >
+                <!-- Compact Slider Component -->
+                {#each [{ id: "window", label: "WIN", val: windowMs, min: 1, max: 1000 }, { id: "chorus", label: "CHO", val: chorus, min: 0, max: 100 }, { id: "delay", label: "DEL", val: delayMs, min: 0, max: 2000 }, { id: "feedback", label: "FDB", val: feedback, min: 0, max: 95 }, { id: "mix", label: "MIX", val: mix, min: 0, max: 100 }, { id: "pitchvol", label: "PVOL", val: pitchvol, min: 0, max: 100 }, { id: "revvol", label: "RVOL", val: revvol, min: 0, max: 100 }, { id: "octdamp", label: "ODMP", val: octdamp, min: 0, max: 100 }, { id: "octvol", label: "OVOL", val: octvol, min: 0, max: 100 }] as slider}
                     <div
-                        class="absolute bottom-0 left-0 w-full bg-white/80 group-hover:bg-[#FF0080] transition-colors"
-                        style="height: {((slider.val - slider.min) /
-                            (slider.max - slider.min)) *
-                            100}%"
-                    ></div>
-                </div>
-                <div
-                    class="label text-[7px] font-bold tracking-wider text-white/40 mt-2 text-center group-hover:text-white transition-colors"
-                >
-                    {slider.label}
-                </div>
+                        class="control-group group flex flex-col items-center w-5"
+                    >
+                        <div
+                            class="slider-container h-24 w-full bg-white/5 rounded-full relative cursor-pointer touch-none overflow-hidden group-hover:bg-white/10 transition-colors"
+                            on:mousedown={(e) =>
+                                startDrag(e, slider.id, slider.min, slider.max)}
+                            on:touchstart={(e) =>
+                                startDrag(e, slider.id, slider.min, slider.max)}
+                        >
+                            <div
+                                class="absolute bottom-0 left-0 w-full bg-white/80 group-hover:bg-[#FF0080] transition-colors"
+                                style="height: {((slider.val - slider.min) /
+                                    (slider.max - slider.min)) *
+                                    100}%"
+                            ></div>
+                        </div>
+                        <div
+                            class="label text-[7px] font-bold tracking-wider text-white/40 mt-2 text-center group-hover:text-white transition-colors"
+                        >
+                            {slider.label}
+                        </div>
+                    </div>
+                {/each}
             </div>
-        {/each}
+        {/if}
     </div>
 {/if}
 

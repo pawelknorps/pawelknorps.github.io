@@ -23,7 +23,13 @@
 
 	// 🚀 Ta zmienna przychodzi z load()
 	export let data; // SvelteKit domyślnie przekazuje `data` z load()
-	const portfolioData = data.portfolioData;
+
+	// Ensure portfolioData exists, otherwise default to empty objects to prevent crashes
+	const portfolioData = data?.portfolioData || {
+		personal: {},
+		musicProjects: [],
+		programmingProjects: [],
+	};
 
 	// Create a new wavy sphere scene
 	let ThreeObject;

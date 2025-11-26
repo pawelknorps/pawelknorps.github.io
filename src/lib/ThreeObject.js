@@ -3,19 +3,25 @@ import { TextureLoader } from 'three';
 import { base } from '$app/paths';
 import { audioSystem } from '$lib/AudioSystem.js';
 
-// Create a new TextureLoader
-const loader = new TextureLoader();
+import { browser } from '$app/environment';
 
-// Load your image from the static folder
-const texture = [
-    loader.load(`${base}/my-photo.webp`),
-    loader.load(`${base}/my-photo2.webp`),
-    loader.load(`${base}/photo3.webp`),
-    loader.load(`${base}/photo4.webp`),
-    loader.load(`${base}/photo5.webp`),
-    loader.load(`${base}/photo6.webp`),
-    loader.load(`${base}/photo8.webp`),
-];
+// Create a new TextureLoader
+let loader;
+let texture = [];
+
+if (browser) {
+    loader = new TextureLoader();
+    // Load your image from the static folder
+    texture = [
+        loader.load(`${base}/my-photo.webp`),
+        loader.load(`${base}/my-photo2.webp`),
+        loader.load(`${base}/photo3.webp`),
+        loader.load(`${base}/photo4.webp`),
+        loader.load(`${base}/photo5.webp`),
+        loader.load(`${base}/photo6.webp`),
+        loader.load(`${base}/photo8.webp`),
+    ];
+}
 
 let Renderer;
 const SCENE = new THREE.Scene();
@@ -134,7 +140,12 @@ SCENE.add(directionalLight);
 
 let z = 5;
 let m = 0.2;
-let CAMERA = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, m, z);
+let CAMERA;
+if (browser) {
+    CAMERA = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, m, z);
+} else {
+    CAMERA = new THREE.PerspectiveCamera(75, 1, m, z);
+}
 CAMERA.position.z = 2.2;
 
 const projectPoints = new THREE.Group();
@@ -578,7 +589,9 @@ const updateScrollPosition = () => {
     morphSpeed = baseMorphSpeed * Math.min(scrollMultiplier, 5);
 };
 
-window.addEventListener('scroll', updateScrollPosition);
+if (browser) {
+    window.addEventListener('scroll', updateScrollPosition);
+}
 
 const animate = async () => {
     requestAnimationFrame(animate);

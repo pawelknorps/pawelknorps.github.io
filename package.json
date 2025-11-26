@@ -22,8 +22,10 @@
 	"type": "module",
 	"dependencies": {
 		"@rnbo/js": "^1.4.2",
+		"@sanity/client": "^7.13.0",
 		"gh-pages": "^4.0.0",
 		"simplenoise": "^1.0.1",
+		"slugify": "^1.6.6",
 		"three": "^0.124.0"
 	}
 }

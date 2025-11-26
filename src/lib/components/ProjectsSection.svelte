@@ -189,6 +189,11 @@
 						</div>
 					</div>
 				{:else if facebookUrl}
+					{@const isReel =
+						facebookUrl && facebookUrl.includes("/reel/")}
+					{@const aspectRatio =
+						data.videoAspectRatio || (isReel ? "9:16" : "16:9")}
+
 					<!-- Facebook Video -->
 					<div
 						class="block h-auto px-0 py-0 tracking-widest transition-all duration-300"
@@ -206,23 +211,30 @@
 							>&nbsp;{data.title}
 						</h2>
 
-						<!-- Changed aspect ratio to square and center-cropped for Facebook reels/videos -->
-						<div
-							class="relative w-full aspect-square max-h-[600px] mb-6 rounded-lg overflow-hidden border border-white/10 shadow-lg bg-black"
-						>
-							<iframe
-								src="https://www.facebook.com/plugins/video.php?href={encodeURIComponent(
-									facebookUrl,
-								)}&show_text=false&t=0"
-								width="100%"
-								height="177.77%"
-								style="border:none;overflow:hidden; transform: translateY(-50%);"
-								scrolling="no"
-								frameborder="0"
-								allowfullscreen="true"
-								allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
-								class="absolute top-1/2 left-0 w-full"
-							></iframe>
+						<!-- Universal Centered Video Container (Fixed 16:9) -->
+						<div class="w-full flex justify-center mb-6">
+							<div
+								class="relative w-full aspect-video rounded-lg overflow-hidden border border-white/10 shadow-lg bg-black"
+							>
+								<iframe
+									src="https://www.facebook.com/plugins/video.php?href={encodeURIComponent(
+										facebookUrl,
+									)}&show_text=false&t=0"
+									width="100%"
+									height="100%"
+									style="border:none;overflow:hidden;"
+									scrolling="no"
+									frameborder="0"
+									allowfullscreen="true"
+									allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+									class="absolute left-0 w-full {aspectRatio ===
+									'9:16'
+										? 'h-[320%] top-1/2 -translate-y-1/2'
+										: aspectRatio === '1:1'
+											? 'h-[178%] top-1/2 -translate-y-1/2'
+											: 'h-full top-0'}"
+								></iframe>
+							</div>
 						</div>
 
 						<h2

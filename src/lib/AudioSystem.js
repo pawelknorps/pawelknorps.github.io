@@ -1,7 +1,8 @@
 
 // AudioSystem.js - Separate audio module for easier debugging
 
-import { createDevice } from '@rnbo/js';
+import pkg from '@rnbo/js';
+const { createDevice } = pkg;
 import patcher from '$lib/pawel.export.json';
 
 class AudioSystem {

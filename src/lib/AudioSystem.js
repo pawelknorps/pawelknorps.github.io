@@ -1,8 +1,8 @@
 
 // AudioSystem.js - Separate audio module for easier debugging
 
-import pkg from '@rnbo/js';
-const { createDevice } = pkg;
+// import pkg from '@rnbo/js';
+// const { createDevice } = pkg;
 // import patcher from '$lib/rnbo/efxplussynth.json';
 
 class AudioSystem {
@@ -12,6 +12,7 @@ class AudioSystem {
         this.rnboDevice = null;
         this.analyser = null; // Audio analysis
         this.isInitialized = false;
+        this.rnboPkg = null;
         this.volume = 0.6;
 
         // Parameter state
@@ -119,6 +120,12 @@ class AudioSystem {
             const patcherModule = await import('$lib/rnbo/efxplussynth.json');
             const patcher = patcherModule.default;
 
+            // Dynamically load RNBO library
+            if (!this.rnboPkg) {
+                this.rnboPkg = await import('@rnbo/js');
+            }
+            const { createDevice } = this.rnboPkg;
+
             // Create RNBO device
             this.rnboDevice = await createDevice({ context: this.audioContext, patcher });
 
@@ -179,8 +186,10 @@ class AudioSystem {
 
         // Forward MIDI to RNBO device
         // RNBO expects a MIDI event object
-        const midiEvent = new pkg.MIDIEvent(this.audioContext.currentTime * 1000, 0, [status, data1, data2]);
-        this.rnboDevice.scheduleEvent(midiEvent);
+        if (this.rnboPkg) {
+            const midiEvent = new this.rnboPkg.MIDIEvent(this.audioContext.currentTime * 1000, 0, [status, data1, data2]);
+            this.rnboDevice.scheduleEvent(midiEvent);
+        }
     }
 
     triggerTestNote() {
@@ -192,11 +201,13 @@ class AudioSystem {
 
         const now = this.audioContext.currentTime * 1000;
 
-        const noteOnEvent = new pkg.MIDIEvent(now, 0, noteOn);
-        const noteOffEvent = new pkg.MIDIEvent(now + duration, 0, noteOff);
+        if (this.rnboPkg) {
+            const noteOnEvent = new this.rnboPkg.MIDIEvent(now, 0, noteOn);
+            const noteOffEvent = new this.rnboPkg.MIDIEvent(now + duration, 0, noteOff);
 
-        this.rnboDevice.scheduleEvent(noteOnEvent);
-        this.rnboDevice.scheduleEvent(noteOffEvent);
+            this.rnboDevice.scheduleEvent(noteOnEvent);
+            this.rnboDevice.scheduleEvent(noteOffEvent);
+        }
 
         console.log('Test note triggered');
     }

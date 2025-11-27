@@ -364,7 +364,9 @@
 <div class="seamless-flow">
 	<HeroSection {adaptiveTextClass} {adaptiveSubTextClass} />
 	<!-- Projects naturally flowing from bottom of page with biographical text -->
-	<div class="projects-flow relative w-full px-4 md:px-8 xl:px-16 2xl:px-24">
+	<div
+		class="projects-flow relative w-full px-4 md:px-8 xl:px-16 2xl:px-24 content-visibility-auto"
+	>
 		<!-- Centered column on mobile, row on xl+ -->
 		<div
 			class="flex flex-col items-center xl:items-start xl:flex-row gap-16 2xl:gap-24"

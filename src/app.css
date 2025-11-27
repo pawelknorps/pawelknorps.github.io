@@ -10,3 +10,9 @@ html { scroll-behavior: smooth; }
 :root::-webkit-scrollbar-track { background: transparent; }
 :root::-webkit-scrollbar-thumb { background: #696969; }
 :root::-webkit-scrollbar-thumb:hover { background: #FF0080; }
+
+/* Performance Optimizations */
+.content-visibility-auto {
+	content-visibility: auto;
+	contain-intrinsic-size: 1px 1000px; /* Estimate height to prevent scrollbar jumping */
+}

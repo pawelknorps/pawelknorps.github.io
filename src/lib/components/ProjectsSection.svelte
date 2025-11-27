@@ -570,6 +570,7 @@
 
 	/* Project card highlight animation */
 	.project-card {
+		will-change: transform;
 		transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 		border-radius: 16px;
 		padding: 1.5rem;

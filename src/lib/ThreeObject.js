@@ -30,6 +30,21 @@ if (browser) {
     });
 }
 
+// Exported function to set the initial texture from a pre-loaded image
+export const setInitialTexture = (img) => {
+    if (!img) return;
+
+    const loadedTexture = new THREE.Texture(img);
+    loadedTexture.needsUpdate = true;
+    texture[0] = loadedTexture;
+
+    // If sphere is already created, update it immediately
+    if (typeof SPHERE !== 'undefined' && SPHERE && SPHERE.material) {
+        SPHERE.material.uniforms.tDiffuse1.value = loadedTexture;
+        SPHERE.material.uniforms.tDiffuse1.needsUpdate = true;
+    }
+};
+
 // Exported function to load textures lazily
 export const loadTextures = () => {
     if (!browser || !loader) return;
@@ -47,7 +62,7 @@ export const loadTextures = () => {
     ];
 
     textureUrls.forEach((url, index) => {
-        // Skip the first texture as it is loaded immediately on init
+        // Skip the first texture as it is loaded immediately on init or via setInitialTexture
         if (index === 0) return;
 
         loader.load(url, (loadedTexture) => {

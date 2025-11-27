@@ -32,6 +32,13 @@
 	let musicProjects = [];
 	let programmingProjects = [];
 
+	// Preload main image
+	let preloadedImage;
+	if (typeof window !== "undefined") {
+		preloadedImage = new Image();
+		preloadedImage.src = `${base}/my-photo.webp`;
+	}
+
 	// Scroll tracking for text animation
 	let scrollY = 0;
 	let innerHeight = 0;
@@ -115,6 +122,15 @@
 
 			// Dynamically import Three.js logic
 			ThreeModule = await import("$lib/ThreeObject.js");
+
+			// Pass pre-loaded image if available
+			if (preloadedImage && preloadedImage.complete) {
+				ThreeModule.setInitialTexture(preloadedImage);
+			} else if (preloadedImage) {
+				preloadedImage.onload = () => {
+					ThreeModule.setInitialTexture(preloadedImage);
+				};
+			}
 
 			// Ensure canvas is properly sized
 			ThreeObject.width = window.innerWidth;

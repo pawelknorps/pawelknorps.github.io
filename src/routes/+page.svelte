@@ -1,17 +1,8 @@
 <script>
 	// Library Imports
 	import { base } from "$app/paths";
-	import {
-		setScene,
-		updateProjects,
-		setAudioSystem,
-		setAudioSystem,
-		focusProject,
-		loadTextures,
-	} from "$lib/ThreeObject.js";
 	import { fade } from "svelte/transition";
 	import { onMount, tick } from "svelte";
-	import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 	// Import components
 	import HeroSection from "$lib/components/HeroSection.svelte";
@@ -34,6 +25,7 @@
 
 	// Create a new wavy sphere scene
 	let ThreeObject;
+	let ThreeModule;
 	let sceneInitialized = false;
 	let sceneReady = false; // New state to track if the scene is loaded
 	// Project data
@@ -121,23 +113,26 @@
 		try {
 			console.log("Initializing 3D scene...");
 
+			// Dynamically import Three.js logic
+			ThreeModule = await import("$lib/ThreeObject.js");
+
 			// Ensure canvas is properly sized
 			ThreeObject.width = window.innerWidth;
 			ThreeObject.height = window.innerHeight;
 
 			// Initialize the scene
-			await setScene(ThreeObject);
+			await ThreeModule.setScene(ThreeObject);
 			sceneInitialized = true;
 			sceneReady = true; // Make sure this is set to true!
 
 			// Lazy load textures now that the scene is ready
-			loadTextures();
+			ThreeModule.loadTextures();
 
 			console.log("Scene initialized successfully");
 
 			// Update projects if data is available
 			if (musicProjects.length > 0 || programmingProjects.length > 0) {
-				updateProjects(musicProjects, programmingProjects);
+				ThreeModule.updateProjects(musicProjects, programmingProjects);
 				console.log("Projects updated");
 			}
 
@@ -386,7 +381,7 @@
 					{adaptiveSubTextClass}
 					on:projectFocus={(e) => {
 						console.log("Page received projectFocus:", e.detail.id);
-						focusProject(e.detail.id);
+						if (ThreeModule) ThreeModule.focusProject(e.detail.id);
 					}}
 				/>
 			</div>

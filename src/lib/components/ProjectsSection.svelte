@@ -10,6 +10,38 @@
 	const dispatch = createEventDispatcher();
 	let observer;
 
+	// Lazy load action
+	const lazyLoad = (node, params) => {
+		const options = {
+			root: null,
+			rootMargin: "200px", // Load when within 200px of viewport
+			threshold: 0,
+		};
+
+		const observer = new IntersectionObserver((entries) => {
+			entries.forEach((entry) => {
+				if (entry.isIntersecting) {
+					node.dispatchEvent(new CustomEvent("enterViewport"));
+					observer.unobserve(node);
+				}
+			});
+		}, options);
+
+		observer.observe(node);
+
+		return {
+			destroy() {
+				observer.disconnect();
+			},
+		};
+	};
+
+	// Track loaded state for each video
+	let loadedVideos = {};
+	const handleEnterViewport = (id) => {
+		loadedVideos[id] = true;
+	};
+
 	onMount(async () => {
 		// Wait for DOM updates
 		await new Promise((r) => setTimeout(r, 100));
@@ -128,18 +160,23 @@
 						<!-- Video Container -->
 						<div
 							class="relative w-full aspect-video mb-6 rounded-lg overflow-hidden border border-white/10 shadow-lg"
+							use:lazyLoad
+							on:enterViewport={() =>
+								handleEnterViewport(`youtube-${i}`)}
 						>
-							<iframe
-								width="100%"
-								height="100%"
-								src="https://www.youtube.com/embed/{youtubeId}"
-								title={data.title}
-								frameborder="0"
-								allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-								allowfullscreen
-								loading="lazy"
-								class="absolute top-0 left-0 w-full h-full"
-							></iframe>
+							{#if loadedVideos[`youtube-${i}`]}
+								<iframe
+									width="100%"
+									height="100%"
+									src="https://www.youtube.com/embed/{youtubeId}"
+									title={data.title}
+									frameborder="0"
+									allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+									allowfullscreen
+									loading="lazy"
+									class="absolute top-0 left-0 w-full h-full"
+								></iframe>
+							{/if}
 						</div>
 
 						<h2
@@ -216,26 +253,31 @@
 						<div class="w-full flex justify-center mb-6">
 							<div
 								class="relative w-full aspect-video rounded-lg overflow-hidden border border-white/10 shadow-lg bg-black"
+								use:lazyLoad
+								on:enterViewport={() =>
+									handleEnterViewport(`facebook-${i}`)}
 							>
-								<iframe
-									src="https://www.facebook.com/plugins/video.php?href={encodeURIComponent(
-										facebookUrl,
-									)}&show_text=false&t=0"
-									width="100%"
-									height="100%"
-									style="border:none;overflow:hidden;"
-									scrolling="no"
-									frameborder="0"
-									allowfullscreen="true"
-									loading="lazy"
-									allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
-									class="absolute left-0 w-full {aspectRatio ===
-									'9:16'
-										? 'h-[320%] top-1/2 -translate-y-1/2'
-										: aspectRatio === '1:1'
-											? 'h-[178%] top-1/2 -translate-y-1/2'
-											: 'h-full top-0'}"
-								></iframe>
+								{#if loadedVideos[`facebook-${i}`]}
+									<iframe
+										src="https://www.facebook.com/plugins/video.php?href={encodeURIComponent(
+											facebookUrl,
+										)}&show_text=false&t=0"
+										width="100%"
+										height="100%"
+										style="border:none;overflow:hidden;"
+										scrolling="no"
+										frameborder="0"
+										allowfullscreen="true"
+										loading="lazy"
+										allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+										class="absolute left-0 w-full {aspectRatio ===
+										'9:16'
+											? 'h-[320%] top-1/2 -translate-y-1/2'
+											: aspectRatio === '1:1'
+												? 'h-[178%] top-1/2 -translate-y-1/2'
+												: 'h-full top-0'}"
+									></iframe>
+								{/if}
 							</div>
 						</div>
 
@@ -305,18 +347,23 @@
 
 						<div
 							class="relative w-full mb-6 rounded-lg overflow-hidden border border-white/10 shadow-lg"
+							use:lazyLoad
+							on:enterViewport={() =>
+								handleEnterViewport(`soundcloud-${i}`)}
 						>
-							<iframe
-								width="100%"
-								height="166"
-								scrolling="no"
-								frameborder="no"
-								allow="autoplay"
-								loading="lazy"
-								src="https://w.soundcloud.com/player/?url={encodeURIComponent(
-									soundcloudUrl,
-								)}&color=%23ff0080&auto_play=false&hide_related=false&show_comments=true&show_user=true&show_reposts=false&show_teaser=true"
-							></iframe>
+							{#if loadedVideos[`soundcloud-${i}`]}
+								<iframe
+									width="100%"
+									height="166"
+									scrolling="no"
+									frameborder="no"
+									allow="autoplay"
+									loading="lazy"
+									src="https://w.soundcloud.com/player/?url={encodeURIComponent(
+										soundcloudUrl,
+									)}&color=%23ff0080&auto_play=false&hide_related=false&show_comments=true&show_user=true&show_reposts=false&show_teaser=true"
+								></iframe>
+							{/if}
 						</div>
 
 						<h2

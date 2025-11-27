@@ -18,6 +18,16 @@ if (browser) {
         placeholder, placeholder, placeholder, placeholder,
         placeholder, placeholder, placeholder
     ];
+
+    // Immediate load of the first texture
+    loader.load(`${base}/my-photo.webp`, (loadedTexture) => {
+        texture[0] = loadedTexture;
+        // If sphere is already created, update it immediately
+        if (typeof SPHERE !== 'undefined' && SPHERE && SPHERE.material) {
+            SPHERE.material.uniforms.tDiffuse1.value = loadedTexture;
+            SPHERE.material.uniforms.tDiffuse1.needsUpdate = true;
+        }
+    });
 }
 
 // Exported function to load textures lazily
@@ -379,6 +389,10 @@ const playMorphSound = () => {
 /**
  * Updates the Three.js scene with project data and regenerates points.
  */
+/**
+ * Updates the Three.js scene with project data and regenerates points.
+ * Uses batch processing to avoid freezing the main thread.
+ */
 export const updateProjects = (musicProjects, programmingProjects) => {
     // Clear existing points
     while (projectPoints.children.length > 0) {
@@ -401,22 +415,43 @@ export const updateProjects = (musicProjects, programmingProjects) => {
         }))
     ];
 
-    // Create points for each project
-    allProjects.forEach((project, globalIndex) => {
-        const goldenAngle = Math.PI * (3 - Math.sqrt(5));
-        const y = 1 - (globalIndex / (allProjects.length - 1)) * 2;
-        const radius = Math.sqrt(1 - y * y);
-        const theta = goldenAngle * globalIndex;
+    // Batch creation variables
+    let currentIndex = 0;
+    const batchSize = 2; // Create 2 points per frame
 
-        const pointMesh = createDestructiblePoint(project, {
-            phi: Math.acos(y),
-            theta: theta
-        });
-        projectPoints.add(pointMesh);
-    });
+    const processBatch = () => {
+        const endIndex = Math.min(currentIndex + batchSize, allProjects.length);
 
-    // Collect interaction spheres for raycasting
-    interactionObjects = projectPoints.children.map(group => group.children.find(child => child instanceof THREE.Mesh));
+        for (let i = currentIndex; i < endIndex; i++) {
+            const project = allProjects[i];
+            const globalIndex = i;
+
+            const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+            const y = 1 - (globalIndex / (allProjects.length - 1)) * 2;
+            const radius = Math.sqrt(1 - y * y);
+            const theta = goldenAngle * globalIndex;
+
+            const pointMesh = createDestructiblePoint(project, {
+                phi: Math.acos(y),
+                theta: theta
+            });
+            projectPoints.add(pointMesh);
+        }
+
+        currentIndex = endIndex;
+
+        if (currentIndex < allProjects.length) {
+            requestAnimationFrame(processBatch);
+        } else {
+            // Finished creating points
+            // Collect interaction spheres for raycasting
+            interactionObjects = projectPoints.children.map(group => group.children.find(child => child instanceof THREE.Mesh));
+            console.log('Finished creating project points');
+        }
+    };
+
+    // Start batch processing
+    processBatch();
 };
 
 let currentFocusedId = null;

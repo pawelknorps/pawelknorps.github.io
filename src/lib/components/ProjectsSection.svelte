@@ -14,7 +14,7 @@
 	const lazyLoad = (node, params) => {
 		const options = {
 			root: null,
-			rootMargin: "200px", // Load when within 200px of viewport
+			rootMargin: "100px", // Load when within 100px of viewport
 			threshold: 0,
 		};
 

@@ -47,6 +47,9 @@ export const loadTextures = () => {
     ];
 
     textureUrls.forEach((url, index) => {
+        // Skip the first texture as it is loaded immediately on init
+        if (index === 0) return;
+
         loader.load(url, (loadedTexture) => {
             texture[index] = loadedTexture;
 

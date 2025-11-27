@@ -3,7 +3,7 @@
 
 import pkg from '@rnbo/js';
 const { createDevice } = pkg;
-import patcher from '$lib/rnbo/efxplussynth.json';
+// import patcher from '$lib/rnbo/efxplussynth.json';
 
 class AudioSystem {
     constructor() {
@@ -44,11 +44,21 @@ class AudioSystem {
             this.analyser.fftSize = 256;
             this.analyser.smoothingTimeConstant = 0.9; // Smoother response
 
-            // Setup MIDI immediately (don't wait for RNBO to load)
-            this.setupMIDI();
+            // Check for mobile device (width < 768px)
+            const isMobile = window.innerWidth < 768;
 
-            // Load RNBO Device
-            await this.loadRNBOPatch();
+            if (!isMobile) {
+                // Setup MIDI immediately (don't wait for RNBO to load)
+                this.setupMIDI();
+
+                // Load RNBO Device
+                await this.loadRNBOPatch();
+            } else {
+                console.log('Mobile device detected: Skipping MIDI and RNBO loading for performance');
+                // Connect master gain directly to analyser for basic audio routing if needed
+                this.masterGain.connect(this.analyser);
+                this.analyser.connect(this.audioContext.destination);
+            }
 
             this.isInitialized = true;
             console.log('Audio system initialized successfully');
@@ -105,6 +115,10 @@ class AudioSystem {
 
     async loadRNBOPatch() {
         try {
+            // Dynamically load the patcher
+            const patcherModule = await import('$lib/rnbo/efxplussynth.json');
+            const patcher = patcherModule.default;
+
             // Create RNBO device
             this.rnboDevice = await createDevice({ context: this.audioContext, patcher });
 

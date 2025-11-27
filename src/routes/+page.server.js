@@ -13,7 +13,7 @@ export const load = async () => {
     }
 
     const query = `{
-    "personal": *[_id == "personal-info"][0],
+
     "musicProjects": *[_type == "project" && category == "music" && !(_id in path("drafts.**"))] {..., "videoAspectRatio": coalesce(videoAspectRatio, "16:9")} | order(orderRank asc, coalesce(releaseDate, year) desc),
     "programmingProjects": *[_type == "project" && category == "programming" && !(_id in path("drafts.**"))] | order(orderRank asc, coalesce(releaseDate, year) desc)
   }`;

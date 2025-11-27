@@ -26,7 +26,6 @@
 
 	// Ensure portfolioData exists, otherwise default to empty objects to prevent crashes
 	const portfolioData = data?.portfolioData || {
-		personal: {},
 		musicProjects: [],
 		programmingProjects: [],
 	};
@@ -36,7 +35,6 @@
 	let sceneInitialized = false;
 	let sceneReady = false; // New state to track if the scene is loaded
 	// Project data
-	let personalData = {};
 	let musicProjects = [];
 	let programmingProjects = [];
 
@@ -188,12 +186,10 @@
 		await tick();
 		// ✅ portfolioData już jest z `load()`, nie fetchuj go ponownie
 		if (portfolioData) {
-			personalData = portfolioData.personal;
 			musicProjects = portfolioData.musicProjects;
 			programmingProjects = portfolioData.programmingProjects;
 
 			console.log("Portfolio data loaded:", {
-				personal: !!personalData,
 				musicProjects: musicProjects.length,
 				programmingProjects: programmingProjects.length,
 			});
@@ -366,7 +362,7 @@
 
 <!-- Seamless flowing content -->
 <div class="seamless-flow">
-	<HeroSection {personalData} {adaptiveTextClass} {adaptiveSubTextClass} />
+	<HeroSection {adaptiveTextClass} {adaptiveSubTextClass} />
 	<!-- Projects naturally flowing from bottom of page with biographical text -->
 	<div class="projects-flow relative w-full px-4 md:px-8 xl:px-16 2xl:px-24">
 		<!-- Centered column on mobile, row on xl+ -->

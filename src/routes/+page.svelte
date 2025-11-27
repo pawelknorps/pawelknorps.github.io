@@ -5,7 +5,9 @@
 		setScene,
 		updateProjects,
 		setAudioSystem,
+		setAudioSystem,
 		focusProject,
+		loadTextures,
 	} from "$lib/ThreeObject.js";
 	import { fade } from "svelte/transition";
 	import { onMount, tick } from "svelte";
@@ -127,6 +129,9 @@
 			await setScene(ThreeObject);
 			sceneInitialized = true;
 			sceneReady = true; // Make sure this is set to true!
+
+			// Lazy load textures now that the scene is ready
+			loadTextures();
 
 			console.log("Scene initialized successfully");
 

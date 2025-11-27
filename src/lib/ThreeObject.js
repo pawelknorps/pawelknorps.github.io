@@ -11,17 +11,48 @@ let texture = [];
 
 if (browser) {
     loader = new TextureLoader();
-    // Load your image from the static folder
+    // Initialize with placeholders (1x1 transparent pixel)
+    // This prevents 404s or WebGL errors while waiting for real textures
+    const placeholder = new THREE.Texture();
     texture = [
-        loader.load(`${base}/my-photo.webp`),
-        loader.load(`${base}/my-photo2.webp`),
-        loader.load(`${base}/photo3.webp`),
-        loader.load(`${base}/photo4.webp`),
-        loader.load(`${base}/photo5.webp`),
-        loader.load(`${base}/photo6.webp`),
-        loader.load(`${base}/photo8.webp`),
+        placeholder, placeholder, placeholder, placeholder,
+        placeholder, placeholder, placeholder
     ];
 }
+
+// Exported function to load textures lazily
+export const loadTextures = () => {
+    if (!browser || !loader) return;
+
+    console.log('Lazy loading textures...');
+
+    const textureUrls = [
+        `${base}/my-photo.webp`,
+        `${base}/my-photo2.webp`,
+        `${base}/photo3.webp`,
+        `${base}/photo4.webp`,
+        `${base}/photo5.webp`,
+        `${base}/photo6.webp`,
+        `${base}/photo8.webp`
+    ];
+
+    textureUrls.forEach((url, index) => {
+        loader.load(url, (loadedTexture) => {
+            texture[index] = loadedTexture;
+
+            // Update shader uniforms if this texture is currently in use
+            if (SPHERE && SPHERE.material) {
+                // We need to trigger a re-render or update uniforms if they are currently using this index
+                // Since we cycle through textures, we can just let the next cycle pick it up, 
+                // or we can force update if it's the very first one.
+                if (index === 0 && SPHERE.material.uniforms.tDiffuse1.value === placeholder) {
+                    SPHERE.material.uniforms.tDiffuse1.value = loadedTexture;
+                    SPHERE.material.uniforms.tDiffuse1.needsUpdate = true;
+                }
+            }
+        });
+    });
+};
 
 let Renderer;
 const SCENE = new THREE.Scene();

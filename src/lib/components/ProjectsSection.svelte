@@ -137,6 +137,7 @@
 								frameborder="0"
 								allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
 								allowfullscreen
+								loading="lazy"
 								class="absolute top-0 left-0 w-full h-full"
 							></iframe>
 						</div>
@@ -226,6 +227,7 @@
 									scrolling="no"
 									frameborder="0"
 									allowfullscreen="true"
+									loading="lazy"
 									allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
 									class="absolute left-0 w-full {aspectRatio ===
 									'9:16'
@@ -310,6 +312,7 @@
 								scrolling="no"
 								frameborder="no"
 								allow="autoplay"
+								loading="lazy"
 								src="https://w.soundcloud.com/player/?url={encodeURIComponent(
 									soundcloudUrl,
 								)}&color=%23ff0080&auto_play=false&hide_related=false&show_comments=true&show_user=true&show_reposts=false&show_teaser=true"

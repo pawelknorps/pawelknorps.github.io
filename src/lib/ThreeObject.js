@@ -45,6 +45,36 @@ export const setInitialTexture = (img) => {
     }
 };
 
+// Exported function to manually load a texture at a specific index
+export const loadTextureAtIndex = (index) => {
+    if (!browser || !loader) return;
+
+    const textureUrls = [
+        `${base}/my-photo.webp`,
+        `${base}/my-photo2.webp`,
+        `${base}/photo3.webp`,
+        `${base}/photo4.webp`,
+        `${base}/photo5.webp`,
+        `${base}/photo6.webp`,
+        `${base}/photo8.webp`
+    ];
+
+    if (index >= 0 && index < textureUrls.length) {
+        const url = textureUrls[index];
+        loader.load(url, (loadedTexture) => {
+            texture[index] = loadedTexture;
+
+            // Update shader uniforms if this texture is currently in use
+            if (SPHERE && SPHERE.material) {
+                if (index === 0 && SPHERE.material.uniforms.tDiffuse1.value === placeholder) {
+                    SPHERE.material.uniforms.tDiffuse1.value = loadedTexture;
+                    SPHERE.material.uniforms.tDiffuse1.needsUpdate = true;
+                }
+            }
+        });
+    }
+};
+
 // Exported function to load textures lazily
 export const loadTextures = () => {
     if (!browser || !loader) return;

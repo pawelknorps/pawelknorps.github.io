@@ -36,6 +36,11 @@
 	let preloadedImage;
 	if (typeof window !== "undefined") {
 		preloadedImage = new Image();
+		preloadedImage.crossOrigin = "anonymous"; // Prevent CORS issues
+		preloadedImage.onload = () =>
+			console.log("Main image preloaded successfully");
+		preloadedImage.onerror = (e) =>
+			console.warn("Main image preload failed:", e);
 		preloadedImage.src = `${base}/my-photo.webp`;
 	}
 
@@ -123,13 +128,20 @@
 			// Dynamically import Three.js logic
 			ThreeModule = await import("$lib/ThreeObject.js");
 
-			// Pass pre-loaded image if available
-			if (preloadedImage && preloadedImage.complete) {
+			// Pass pre-loaded image if available and valid
+			if (
+				preloadedImage &&
+				preloadedImage.complete &&
+				preloadedImage.naturalWidth > 0
+			) {
+				console.log("Using preloaded image");
 				ThreeModule.setInitialTexture(preloadedImage);
-			} else if (preloadedImage) {
-				preloadedImage.onload = () => {
-					ThreeModule.setInitialTexture(preloadedImage);
-				};
+			} else {
+				console.warn(
+					"Preloaded image not ready or failed, falling back to standard loader",
+				);
+				// Fallback: manually trigger load of index 0
+				ThreeModule.loadTextureAtIndex(0);
 			}
 
 			// Ensure canvas is properly sized
@@ -397,6 +409,7 @@
 					{programmingProjects}
 					{adaptiveTextClass}
 					{adaptiveSubTextClass}
+					triggerLoad={sceneReady}
 					on:projectFocus={(e) => {
 						console.log("Page received projectFocus:", e.detail.id);
 						if (ThreeModule) ThreeModule.focusProject(e.detail.id);

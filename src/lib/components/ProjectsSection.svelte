@@ -6,6 +6,7 @@
 	export let programmingProjects;
 	export let adaptiveTextClass;
 	export let adaptiveSubTextClass;
+	export let triggerLoad = false; // New prop to trigger loading
 
 	const dispatch = createEventDispatcher();
 	let observer;
@@ -39,7 +40,36 @@
 	// Track loaded state for each video
 	let loadedVideos = {};
 	const handleEnterViewport = (id) => {
-		loadedVideos[id] = true;
+		if (!loadedVideos[id]) {
+			loadedVideos[id] = true;
+		}
+	};
+
+	// Watch for triggerLoad
+	$: if (triggerLoad) {
+		loadAllVideosStaggered();
+	}
+
+	const loadAllVideosStaggered = async () => {
+		console.log("Starting staggered video loading...");
+		const allIds = [];
+
+		// Collect all IDs
+		musicProjects.forEach((_, i) => {
+			allIds.push(`youtube-${i}`);
+			allIds.push(`facebook-${i}`);
+			allIds.push(`soundcloud-${i}`);
+		});
+
+		// Load one by one with delay
+		for (const id of allIds) {
+			if (!loadedVideos[id]) {
+				loadedVideos[id] = true;
+				// Wait 200ms between each video to avoid network congestion
+				await new Promise((r) => setTimeout(r, 200));
+			}
+		}
+		console.log("All videos triggered for loading");
 	};
 
 	onMount(async () => {

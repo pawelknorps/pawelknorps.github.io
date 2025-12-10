@@ -350,20 +350,30 @@
 {/if}
 -->
 
-{#if !sceneReady}
-	<div
-		class="fixed top-0 left-0 w-full h-full gradient-placeholder z-0"
-	></div>
-{/if}
+<!-- Scene Container for LCP and CLS optimization -->
+<div class="scene-container fixed top-0 left-0 w-full h-full z-0">
+	{#if !sceneReady}
+		<img
+			src="{base}/scene-poster.webp"
+			alt="3D Scene Preview"
+			class="poster absolute inset-0 w-full h-full object-cover z-10"
+			out:fade={{ duration: 1000 }}
+		/>
+		<!-- Fallback gradient if image fails or while loading -->
+		<div
+			class="absolute inset-0 w-full h-full gradient-placeholder -z-10"
+		></div>
+	{/if}
 
-<canvas
-	bind:this={ThreeObject}
-	on:click={handleCanvasClick}
-	class="fixed top-0 left-0 w-full h-full cursor-grab transition-opacity duration-1000"
-	style:opacity={sceneReady && !showVideo ? 1 : 0}
-	style:pointer-events={sceneReady && !showVideo ? "auto" : "none"}
-	style:z-index={0}
-></canvas>
+	<canvas
+		bind:this={ThreeObject}
+		on:click={handleCanvasClick}
+		class="canvas-layer absolute inset-0 w-full h-full cursor-grab"
+		style:opacity={sceneReady && !showVideo ? 1 : 0}
+		style:pointer-events={sceneReady && !showVideo ? "auto" : "none"}
+		style:z-index={1}
+	></canvas>
+</div>
 
 <!-- STAN WODY Button -->
 <!--

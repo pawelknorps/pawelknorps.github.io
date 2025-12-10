@@ -1155,6 +1155,14 @@ export const setScene = async (canvas) => {
 
     console.log('Scene initialized with drag controls');
 
+    // Async Shader Compilation to avoid freezing the main thread
+    if (Renderer.compileAsync) {
+        await Renderer.compileAsync(SCENE, CAMERA);
+    } else {
+        // Fallback for older Three.js versions
+        Renderer.compile(SCENE, CAMERA);
+    }
+
     await resize();
     await animate();
 };

@@ -23,26 +23,14 @@
 		programmingProjects: [],
 	};
 
-	// Create a new wavy sphere scene
-	let ThreeObject;
-	let ThreeModule;
-	let sceneInitialized = false;
-	let sceneReady = false; // New state to track if the scene is loaded
+	// Lazy Loading State
+	let ThreeComponent;
+	let sceneReady = false;
+	let threeSceneInstance;
+
 	// Project data
 	let musicProjects = [];
 	let programmingProjects = [];
-
-	// Preload main image
-	let preloadedImage;
-	if (typeof window !== "undefined") {
-		preloadedImage = new Image();
-		preloadedImage.crossOrigin = "anonymous"; // Prevent CORS issues
-		preloadedImage.onload = () =>
-			console.log("Main image preloaded successfully");
-		preloadedImage.onerror = (e) =>
-			console.warn("Main image preload failed:", e);
-		preloadedImage.src = `${base}/my-photo.webp`;
-	}
 
 	// Scroll tracking for text animation
 	let scrollY = 0;
@@ -58,156 +46,30 @@
 	$: showBio = innerWidth >= 1300; // Show bio only on xl screens and larger
 	$: projectsHeight = 0;
 
-	// Function to sample canvas brightness
-	function sampleCanvasBrightness() {
-		if (!ThreeObject || !sceneInitialized) return;
+	// Handle brightness updates from ThreeScene
+	function handleBrightnessChange(event) {
+		backgroundBrightness = event.detail;
 
-		try {
-			const canvas = ThreeObject;
-			const ctx = canvas.getContext("2d", { willReadFrequently: true });
-			if (!ctx) return;
-
-			// Sample multiple points across the canvas
-			const samplePoints = [
-				{ x: canvas.width * 0.2, y: canvas.height * 0.3 },
-				{ x: canvas.width * 0.5, y: canvas.height * 0.5 },
-				{ x: canvas.width * 0.8, y: canvas.height * 0.7 },
-				{ x: canvas.width * 0.3, y: canvas.height * 0.8 },
-				{ x: canvas.width * 0.7, y: canvas.height * 0.2 },
-			];
-
-			let totalBrightness = 0;
-			let validSamples = 0;
-
-			samplePoints.forEach((point) => {
-				try {
-					const imageData = ctx.getImageData(point.x, point.y, 1, 1);
-					const [r, g, b] = imageData.data;
-					// Calculate relative luminance
-					const brightness =
-						(0.299 * r + 0.587 * g + 0.114 * b) / 255;
-					totalBrightness += brightness;
-					validSamples++;
-				} catch (e) {
-					// Skip invalid samples
-				}
-			});
-
-			if (validSamples > 0) {
-				backgroundBrightness = totalBrightness / validSamples;
-
-				// Update text classes based on brightness
-				if (backgroundBrightness > 0.6) {
-					// Bright background - use dark text
-					adaptiveTextClass = "text-gray-900";
-					adaptiveSubTextClass = "text-gray-700";
-				} else if (backgroundBrightness > 0.4) {
-					// Medium background - use high contrast
-					adaptiveTextClass = "text-white";
-					adaptiveSubTextClass = "text-gray-200";
-				} else {
-					// Dark background - use light text
-					adaptiveTextClass = "text-white";
-					adaptiveSubTextClass = "text-gray-300";
-				}
-			}
-		} catch (error) {
-			// Fallback to default colors
+		// Update text classes based on brightness
+		if (backgroundBrightness > 0.6) {
+			// Bright background - use dark text
+			adaptiveTextClass = "text-gray-900";
+			adaptiveSubTextClass = "text-gray-700";
+		} else if (backgroundBrightness > 0.4) {
+			// Medium background - use high contrast
+			adaptiveTextClass = "text-white";
+			adaptiveSubTextClass = "text-gray-200";
+		} else {
+			// Dark background - use light text
 			adaptiveTextClass = "text-white";
 			adaptiveSubTextClass = "text-gray-300";
 		}
 	}
 
-	// Initialize the 3D scene
-	const initializeScene = async () => {
-		if (!ThreeObject || sceneInitialized) return;
-
-		try {
-			console.log("Initializing 3D scene...");
-
-			// Dynamically import Three.js logic
-			ThreeModule = await import("$lib/ThreeObject.js");
-
-			// Pass pre-loaded image if available and valid
-			if (
-				preloadedImage &&
-				preloadedImage.complete &&
-				preloadedImage.naturalWidth > 0
-			) {
-				console.log("Using preloaded image");
-				ThreeModule.setInitialTexture(preloadedImage);
-			} else {
-				console.warn(
-					"Preloaded image not ready or failed, falling back to standard loader",
-				);
-				// Fallback: manually trigger load of index 0
-				ThreeModule.loadTextureAtIndex(0);
-			}
-
-			// Ensure canvas is properly sized
-			ThreeObject.width = window.innerWidth;
-			ThreeObject.height = window.innerHeight;
-
-			// Initialize the scene
-			await ThreeModule.setScene(ThreeObject);
-			sceneInitialized = true;
-			sceneReady = true; // Make sure this is set to true!
-
-			// Lazy load textures now that the scene is ready
-			ThreeModule.loadTextures();
-
-			console.log("Scene initialized successfully");
-
-			// Update projects if data is available
-			if (musicProjects.length > 0 || programmingProjects.length > 0) {
-				ThreeModule.updateProjects(musicProjects, programmingProjects);
-				console.log("Projects updated");
-			}
-
-			// Start brightness sampling
-			// In your page.svelte script
-
-			let frameCount = 0;
-			let brightnessInterval; // We'll keep this name for the handle
-
-			function startBrightnessSampling() {
-				function sampleLoop() {
-					// Only sample every 10 frames to save CPU
-					if (frameCount % 10 === 0) {
-						sampleCanvasBrightness();
-					}
-					frameCount++;
-					brightnessInterval = requestAnimationFrame(sampleLoop);
-				}
-				sampleLoop();
-			}
-
-			function stopBrightnessSampling() {
-				cancelAnimationFrame(brightnessInterval);
-			}
-
-			// In loadAndInitializeScene() function, replace setInterval:
-			// brightnessInterval = setInterval(sampleCanvasBrightness, 200); // <-- REMOVE
-			startBrightnessSampling(); // <-- ADD
-
-			// In your onMount's return function (cleanup):
-			return () => {
-				stopBrightnessSampling();
-			};
-		} catch (error) {
-			console.error("Failed to initialize scene:", error);
-		}
-	};
-
 	// Audio state tracking
 	let isAudioEnabled = false;
 	let showVideo = false; // State for "STAN WODY" video background
 	let videoElement; // Reference to the video element
-
-	// Sample brightness periodically
-	let brightnessInterval;
-
-	// Reactive statement removed to avoid conflicts with transition events
 
 	onMount(async () => {
 		// Wait for DOM to be ready
@@ -225,47 +87,24 @@
 			console.error("Brak danych portfolio");
 		}
 
-		// Wait a bit more for canvas to be available
-		// Optimize TBT: Wait for browser to be idle before initializing heavy 3D scene
-		const load3D = async () => {
-			if (ThreeObject) {
-				await initializeScene();
-			} else {
-				console.error("Canvas element not available");
-			}
+		// Optimize TBT: Wait for browser to be idle before importing heavy 3D component
+		const loadComponent = async () => {
+			const module = await import("$lib/components/ThreeScene.svelte");
+			ThreeComponent = module.default;
 		};
 
 		if ("requestIdleCallback" in window) {
-			// requestIdleCallback waits until the main thread is free
-			requestIdleCallback(load3D);
+			requestIdleCallback(loadComponent, { timeout: 3000 });
 		} else {
-			// Fallback for Safari < 2023 and other browsers
-			setTimeout(load3D, 2000);
+			setTimeout(loadComponent, 2000);
 		}
-
-		// Cleanup function
-		return () => {
-			if (brightnessInterval) {
-				clearInterval(brightnessInterval);
-			}
-		};
 	});
 
-	// Add a manual initialization trigger for debugging
-	const handleCanvasClick = () => {
-		if (!sceneInitialized) {
-			console.log("Manual scene initialization triggered");
-			initializeScene();
-		}
-		// Audio will be initialized automatically in ThreeObject.js onMouseDown
+	const handleAudioReq = () => {
 		isAudioEnabled = true;
 	};
 
 	const toggleVideo = () => {
-		// Ensure audio is initialized when entering "STAN WODY" mode
-		if (!sceneInitialized) {
-			initializeScene();
-		}
 		isAudioEnabled = true;
 
 		if (showVideo && videoElement) {
@@ -343,22 +182,6 @@
 
 <svelte:window bind:scrollY bind:innerHeight bind:innerWidth />
 
-<!--
-{#if showVideo}
-	<video
-		bind:this={videoElement}
-		src="{base}/demo.mp4"
-		loop
-		muted={false}
-		playsinline
-		transition:fade={{ duration: 1000 }}
-		on:introstart={(e) => e.target.play().catch((err) => console.error("Video play failed:", err))}
-		on:outrostart={(e) => e.target.pause()}
-		class="fixed top-0 left-0 w-full h-full object-cover z-0"
-	></video>
-{/if}
--->
-
 <!-- Scene Container for LCP and CLS optimization -->
 <div class="scene-container fixed top-0 left-0 w-full h-full z-0">
 	{#if !sceneReady}
@@ -374,29 +197,21 @@
 		></div>
 	{/if}
 
-	<canvas
-		bind:this={ThreeObject}
-		on:click={handleCanvasClick}
-		class="canvas-layer absolute inset-0 w-full h-full cursor-grab"
-		style:opacity={sceneReady && !showVideo ? 1 : 0}
-		style:pointer-events={sceneReady && !showVideo ? "auto" : "none"}
-		style:z-index={1}
-	></canvas>
+	{#if ThreeComponent}
+		<svelte:component
+			this={ThreeComponent}
+			bind:this={threeSceneInstance}
+			{musicProjects}
+			{programmingProjects}
+			bind:sceneReady
+			on:brightnessChange={handleBrightnessChange}
+			on:audioReq={handleAudioReq}
+		/>
+	{/if}
 </div>
 
-<!-- STAN WODY Button -->
-<!--
-<button
-	on:click={toggleVideo}
-	class="fixed top-8 left-1/2 transform -translate-x-1/2 z-50 text-white font-black tracking-[0.2em] text-sm md:text-base mix-blend-difference hover:text-[#FF0080] transition-colors duration-300 cursor-pointer"
-	style="font-family: 'Inter', sans-serif;"
->
-	STAN WODY
-</button>
--->
-
 <!-- Simple audio enable notice - top center -->
-{#if sceneInitialized && !isAudioEnabled && !showVideo}
+{#if sceneReady && !isAudioEnabled && !showVideo}
 	<div
 		class="audio-notice fixed top-16 left-1/2 transform -translate-x-1/2 z-50 bg-black/80 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm border border-white/20 transition-all duration-300"
 	>
@@ -431,7 +246,8 @@
 					triggerLoad={sceneReady}
 					on:projectFocus={(e) => {
 						console.log("Page received projectFocus:", e.detail.id);
-						if (ThreeModule) ThreeModule.focusProject(e.detail.id);
+						if (threeSceneInstance)
+							threeSceneInstance.focusProject(e.detail.id);
 					}}
 				/>
 			</div>
@@ -453,13 +269,6 @@
 		</div>
 	</div>
 </div>
-
-<!-- Debug info (remove in production) -->
-<!-- {#if !sceneInitialized}
-<div class="fixed bottom-4 left-4 z-50 bg-red-900/70 text-white px-3 py-2 rounded-lg text-sm backdrop-blur-sm">
-	⚠️ Scene not initialized - click canvas to retry
-</div>
-{/if} -->
 
 <style>
 	/* Smooth scrolling */
@@ -483,11 +292,6 @@
 		pointer-events: none; /* Re-enable pointer events for content */
 	}
 
-	/* By default, let Three.js control all gestures */
-	canvas {
-		touch-action: none;
-	}
-
 	/* Simple audio notice */
 	.audio-notice {
 		animation: gentlePulse 2s ease-in-out infinite;
@@ -500,13 +304,6 @@
 		}
 		50% {
 			opacity: 1;
-		}
-	}
-
-	/* Responsive adjustments for mobile */
-	@media (max-width: 800px) {
-		canvas {
-			touch-action: pan-y;
 		}
 	}
 

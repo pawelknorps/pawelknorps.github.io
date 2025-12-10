@@ -209,7 +209,7 @@ const morphShader = {
 };
 
 const SPHERE = new THREE.Mesh(
-    new THREE.SphereGeometry(1, 200, 200),
+    new THREE.SphereGeometry(1, 64, 64),
     new THREE.ShaderMaterial(morphShader)
 );
 

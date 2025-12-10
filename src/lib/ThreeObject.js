@@ -821,8 +821,9 @@ const animate = async () => {
         // Slow breathing movement for each point
         const timeFactor = (now * 0.0005) + userData.movementOffset;
         const movementScale = 0.05 * Math.sin(timeFactor);
-        const newPosition = userData.originalPosition.clone().multiplyScalar(1 + movementScale);
-        pointGroup.position.copy(newPosition);
+
+        // Optimize: Modifying position in-place instead of creating new Vector3 with clone()
+        pointGroup.position.copy(userData.originalPosition).multiplyScalar(1 + movementScale);
 
         if (material && material.uniforms) {
             material.uniforms.time.value = now * 0.00001;

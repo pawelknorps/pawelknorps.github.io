@@ -226,13 +226,22 @@
 		}
 
 		// Wait a bit more for canvas to be available
-		setTimeout(async () => {
+		// Optimize TBT: Wait for browser to be idle before initializing heavy 3D scene
+		const load3D = async () => {
 			if (ThreeObject) {
 				await initializeScene();
 			} else {
 				console.error("Canvas element not available");
 			}
-		}, 100);
+		};
+
+		if ("requestIdleCallback" in window) {
+			// requestIdleCallback waits until the main thread is free
+			requestIdleCallback(load3D);
+		} else {
+			// Fallback for Safari < 2023 and other browsers
+			setTimeout(load3D, 2000);
+		}
 
 		// Cleanup function
 		return () => {

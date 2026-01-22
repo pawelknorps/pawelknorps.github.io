@@ -247,8 +247,15 @@ let allProjects = [];
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 let INTERSECTED = null;
-let interactionObjects = [];
+const interactionObjects = [];
 let cinemaVideo = null; // Track background video for audio control
+
+// --- Instanced Particles Variables ---
+let instancedParticleSystem = null;
+let instancedInteractionGroups = []; // Store references for animation updates
+let particleHoverFactors;
+let particleDestructionFactors;
+// ------------------------------------
 
 // Set audio system reference
 export const setAudioSystem = (system) => {
@@ -441,11 +448,96 @@ const playMorphSound = () => {
  * Updates the Three.js scene with project data and regenerates points.
  * Uses batch processing to avoid freezing the main thread.
  */
+// --- Instanced Shader Material ---
+const instancedParticleMaterial = new THREE.ShaderMaterial({
+    uniforms: {
+        time: { value: 0 }
+    },
+    vertexShader: `
+        attribute float aSize;
+        attribute vec3 aColor;
+        attribute vec3 aInstancePosition;
+        attribute float aHoverFactor;
+        attribute float aDestructionFactor;
+        attribute float aMovementOffset;
+        
+        varying vec3 vColor;
+        varying float vDestructionFactor;
+        
+        uniform float time;
+        
+        void main() {
+            vColor = aColor;
+            vDestructionFactor = aDestructionFactor;
+            
+            // Local vertex position (one of the points)
+            vec3 pos = position;
+            
+            // Project position on sphere
+            vec3 instancePos = aInstancePosition;
+            
+            // Local expansion during hover
+            pos += normalize(position) * aHoverFactor * 0.1;
+            
+            // Final world position
+            vec3 worldPos = instancePos + pos;
+            
+            // Destruction effect
+            if (aDestructionFactor > 0.0) {
+                float explosionForce = aDestructionFactor * 2.0;
+                worldPos += normalize(pos) * explosionForce;
+                worldPos += vec3(
+                    sin(time * 10.0 + pos.x * 20.0) * aDestructionFactor * 0.05,
+                    cos(time * 8.0 + pos.y * 15.0) * aDestructionFactor * 0.05,
+                    sin(time * 12.0 + pos.z * 18.0) * aDestructionFactor * 0.05
+                );
+            }
+            
+            vec4 mvPosition = modelViewMatrix * vec4(worldPos, 1.0);
+            gl_PointSize = aSize * (200.0 / -mvPosition.z) * (1.0 - aDestructionFactor * 0.5);
+            gl_Position = projectionMatrix * mvPosition;
+        }
+    `,
+    fragmentShader: `
+        varying vec3 vColor;
+        varying float vDestructionFactor;
+        
+        void main() {
+            float distance = length(gl_PointCoord - vec2(0.5));
+            if (distance > 0.5) discard;
+            
+            float alpha = 1.0 - distance * 2.0;
+            alpha *= (1.0 - vDestructionFactor * 0.7);
+            
+            gl_FragColor = vec4(vColor, alpha);
+        }
+    `,
+    transparent: true,
+    depthTest: false,
+    blending: THREE.AdditiveBlending
+});
+
+/**
+ * Updates the Three.js scene with project data and regenerates points.
+ * Uses instanced rendering for efficiency.
+ */
 export const updateProjects = (musicProjects, programmingProjects) => {
-    // Clear existing points
+    // Clear existing points and dispose of resources
+    projectPoints.children.forEach(child => {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) {
+            if (Array.isArray(child.material)) {
+                child.material.forEach(m => m.dispose());
+            } else {
+                child.material.dispose();
+            }
+        }
+    });
     while (projectPoints.children.length > 0) {
         projectPoints.remove(projectPoints.children[0]);
     }
+    interactionObjects.length = 0;
+    instancedInteractionGroups = [];
 
     // Combine all projects and add IDs
     allProjects = [
@@ -463,9 +555,47 @@ export const updateProjects = (musicProjects, programmingProjects) => {
         }))
     ];
 
-    // Batch creation variables
+    if (allProjects.length === 0) return;
+
+    // Create Instanced Geometry
+    const particleCountPerProject = 5;
+    const baseGeometry = new THREE.BufferGeometry();
+    const vertices = new Float32Array(particleCountPerProject * 3);
+    for (let i = 0; i < particleCountPerProject; i++) {
+        const phi = Math.random() * Math.PI * 2;
+        const theta = Math.random() * Math.PI;
+        const radius = 0.005 + Math.random() * 0.01;
+        vertices[i * 3] = radius * Math.sin(theta) * Math.cos(phi);
+        vertices[i * 3 + 1] = radius * Math.sin(theta) * Math.sin(phi);
+        vertices[i * 3 + 2] = radius * Math.cos(theta);
+    }
+    baseGeometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+
+    const instancedGeometry = new THREE.InstancedBufferGeometry();
+    instancedGeometry.attributes.position = baseGeometry.attributes.position;
+
+    const numInstances = allProjects.length;
+    particleHoverFactors = new Float32Array(numInstances);
+    particleDestructionFactors = new Float32Array(numInstances);
+    const instancePositions = new Float32Array(numInstances * 3);
+    const instanceColors = new Float32Array(numInstances * 3);
+    const instanceSizes = new Float32Array(numInstances);
+    const movementOffsets = new Float32Array(numInstances);
+
+    instancedGeometry.setAttribute('aInstancePosition', new THREE.InstancedBufferAttribute(instancePositions, 3));
+    instancedGeometry.setAttribute('aHoverFactor', new THREE.InstancedBufferAttribute(particleHoverFactors, 1));
+    instancedGeometry.setAttribute('aDestructionFactor', new THREE.InstancedBufferAttribute(particleDestructionFactors, 1));
+    instancedGeometry.setAttribute('aColor', new THREE.InstancedBufferAttribute(instanceColors, 3));
+    instancedGeometry.setAttribute('aSize', new THREE.InstancedBufferAttribute(instanceSizes, 1));
+    instancedGeometry.setAttribute('aMovementOffset', new THREE.InstancedBufferAttribute(movementOffsets, 1));
+
+    instancedParticleSystem = new THREE.Points(instancedGeometry, instancedParticleMaterial);
+    instancedParticleSystem.frustumCulled = false; // Ensure it doesn't pop out
+    projectPoints.add(instancedParticleSystem);
+
+    // Batch creation of interaction objects
     let currentIndex = 0;
-    const batchSize = 2; // Create 2 points per frame
+    const batchSize = 2;
 
     const processBatch = () => {
         const endIndex = Math.min(currentIndex + batchSize, allProjects.length);
@@ -475,30 +605,69 @@ export const updateProjects = (musicProjects, programmingProjects) => {
             const globalIndex = i;
 
             const goldenAngle = Math.PI * (3 - Math.sqrt(5));
-            const y = 1 - (globalIndex / (allProjects.length - 1)) * 2;
+            const y = 1 - (globalIndex / (max(1, allProjects.length - 1))) * 2;
             const radius = Math.sqrt(1 - y * y);
             const theta = goldenAngle * globalIndex;
 
-            const pointMesh = createDestructiblePoint(project, {
-                phi: Math.acos(y),
-                theta: theta
-            });
-            projectPoints.add(pointMesh);
+            const phi = Math.acos(y);
+            const sphereRadius = 1.6;
+            const posX = sphereRadius * Math.sin(phi) * Math.cos(theta);
+            const posY = sphereRadius * Math.sin(phi) * Math.sin(theta);
+            const posZ = sphereRadius * Math.cos(phi);
+
+            // Update instanced attributes
+            instancePositions[i * 3] = posX;
+            instancePositions[i * 3 + 1] = posY;
+            instancePositions[i * 3 + 2] = posZ;
+
+            instanceColors[i * 3] = 1.0;
+            instanceColors[i * 3 + 1] = 0.0 + Math.random() * 0.2;
+            instanceColors[i * 3 + 2] = 0.5 + Math.random() * 0.3;
+
+            instanceSizes[i] = 1 + Math.random() * 1.2;
+            movementOffsets[i] = Math.random() * 2 * Math.PI;
+
+            // Create interaction group
+            const pointGroup = new THREE.Group();
+            pointGroup.position.set(posX, posY, posZ);
+
+            const interactionSphere = new THREE.Mesh(
+                new THREE.SphereGeometry(0.09, 8, 8),
+                new THREE.MeshBasicMaterial({ visible: false })
+            );
+            pointGroup.add(interactionSphere);
+            projectPoints.add(pointGroup);
+
+            interactionObjects.push(interactionSphere);
+
+            pointGroup.userData = {
+                ...project,
+                originalPosition: pointGroup.position.clone(),
+                instanceIndex: i,
+                hoverFactor: 0,
+                destructionFactor: 0,
+                isHovered: false,
+                isClicked: false,
+                movementOffset: movementOffsets[i]
+            };
+
+            instancedInteractionGroups.push(pointGroup);
         }
+
+        instancedGeometry.attributes.aInstancePosition.needsUpdate = true;
+        instancedGeometry.attributes.aColor.needsUpdate = true;
+        instancedGeometry.attributes.aSize.needsUpdate = true;
+        instancedGeometry.attributes.aMovementOffset.needsUpdate = true;
 
         currentIndex = endIndex;
 
         if (currentIndex < allProjects.length) {
             requestAnimationFrame(processBatch);
-        } else {
-            // Finished creating points
-            // Collect interaction spheres for raycasting
-            interactionObjects = projectPoints.children.map(group => group.children.find(child => child instanceof THREE.Mesh));
-            console.log('Finished creating project points');
         }
     };
 
-    // Start batch processing
+    function max(a, b) { return a > b ? a : b; }
+
     processBatch();
 };
 
@@ -511,12 +680,12 @@ let currentFocusedId = null;
 export const focusProject = (id) => {
     // console.log("focusProject called with:", id);
 
-    // Always find the group to ensure it exists
-    const pointGroup = projectPoints.children.find(p => p.userData.id === id);
+    // Find the group among children that has the matching ID
+    const pointGroup = instancedInteractionGroups.find(p => p.userData && p.userData.id === id);
 
     if (pointGroup) {
         // Reset hover state for all points
-        projectPoints.children.forEach(p => {
+        instancedInteractionGroups.forEach(p => {
             if (p !== pointGroup) {
                 p.userData.isHovered = false;
             }
@@ -536,153 +705,24 @@ export const focusProject = (id) => {
             uniforms.tDiffuse1.value = texture[currentTextureIndex];
             currentTextureIndex = (currentTextureIndex + 1) % texture.length;
             uniforms.tDiffuse2.value = texture[currentTextureIndex];
-
-            // Audio removed from scroll interaction per user request
         }
 
-        // Calculate target rotation to bring point to front (0, 0, r)
+        // Calculate target rotation to bring point to front
         const p = pointGroup.userData.originalPosition;
-
-        // Calculate the rotation needed to bring p to (0, 0, r)
-        // angle = atan2(x, z) is the angle of the point. We want to rotate by -angle.
         const targetY = -Math.atan2(p.x, p.z);
-
-        // Rotation X (around horizontal axis) handles Y/Z plane
         const zProjected = Math.sqrt(p.x * p.x + p.z * p.z);
         const targetX = Math.atan2(p.y, zProjected);
 
-        // Compensate for auto-rotation
         const autoRotationX = now * 0.00019;
         const autoRotationY = now * 0.00019;
 
-        // Apply rotation
         targetRotation.y = targetY - autoRotationY;
         targetRotation.x = targetX - autoRotationX;
 
-        // Force a small "kick" to ensure the loop wakes up if it was sleeping (though it shouldn't be)
-        // and to make the movement feel more "active"
-        sphereRotation.x += (targetRotation.x - sphereRotation.x) * 0.02; // Reduced from 0.1
-        sphereRotation.y += (targetRotation.y - sphereRotation.y) * 0.02; // Reduced from 0.1
+        // Smooth transition
+        sphereRotation.x += (targetRotation.x - sphereRotation.x) * 0.02;
+        sphereRotation.y += (targetRotation.y - sphereRotation.y) * 0.02;
     }
-};
-
-/**
- * Creates a destructible point group with particles and interaction sphere.
- */
-const createDestructiblePoint = (project, position) => {
-    const pointGroup = new THREE.Group();
-
-    // Particle system
-    const particleCount = 5;
-    const particles = new THREE.BufferGeometry();
-    const positions = new Float32Array(particleCount * 3);
-    const colors = new Float32Array(particleCount * 3);
-    const sizes = new Float32Array(particleCount);
-
-    for (let i = 0; i < particleCount; i++) {
-        const phi = Math.random() * Math.PI * 2;
-        const theta = Math.random() * Math.PI;
-        const radius = 0.005 + Math.random() * 0.01;
-
-        positions[i * 3] = radius * Math.sin(theta) * Math.cos(phi);
-        positions[i * 3 + 1] = radius * Math.sin(theta) * Math.sin(phi);
-        positions[i * 3 + 2] = radius * Math.cos(theta);
-
-        colors[i * 3] = 1.0;
-        colors[i * 3 + 1] = 0.0 + Math.random() * 0.2;
-        colors[i * 3 + 2] = 0.5 + Math.random() * 0.3;
-
-        sizes[i] = 1 + Math.random() * 1.2;
-    }
-
-    particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    particles.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    particles.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
-
-    const particleMaterial = new THREE.ShaderMaterial({
-        uniforms: {
-            time: { value: 0 },
-            destructionFactor: { value: 0 },
-            hoverFactor: { value: 0 }
-        },
-        vertexShader: `
-            attribute float size;
-            attribute vec3 color;
-            varying vec3 vColor;
-            uniform float time;
-            uniform float destructionFactor;
-            uniform float hoverFactor;
-            
-            void main() {
-                vColor = color;
-                
-                vec3 pos = position;
-                
-                pos += normalize(position) * hoverFactor * 0.1;
-                
-                if (destructionFactor > 0.0) {
-                    float explosionForce = destructionFactor * 2.0;
-                    pos += normalize(position) * explosionForce;
-                    pos += vec3(
-                        sin(time * 10.0 + position.x * 20.0) * destructionFactor * 0.05,
-                        cos(time * 8.0 + position.y * 15.0) * destructionFactor * 0.05,
-                        sin(time * 12.0 + position.z * 18.0) * destructionFactor * 0.05
-                    );
-                }
-                
-                vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
-                gl_PointSize = size * (200.0 / -mvPosition.z) * (1.0 - destructionFactor * 0.5);
-                gl_Position = projectionMatrix * mvPosition;
-            }
-        `,
-        fragmentShader: `
-            varying vec3 vColor;
-            uniform float destructionFactor;
-            
-            void main() {
-                float distance = length(gl_PointCoord - vec2(0.5));
-                if (distance > 0.5) discard;
-                
-                float alpha = 1.0 - distance * 2.0;
-                alpha *= (1.0 - destructionFactor * 0.7);
-                
-                gl_FragColor = vec4(vColor, alpha);
-            }
-        `,
-        transparent: true,
-        depthTest: false,
-        blending: THREE.AdditiveBlending
-    });
-
-    const particleSystem = new THREE.Points(particles, particleMaterial);
-    pointGroup.add(particleSystem);
-
-    // Add interaction sphere for raycasting
-    const interactionSphere = new THREE.Mesh(
-        new THREE.SphereGeometry(0.09, 8, 8), // był 0.05
-        new THREE.MeshBasicMaterial({ visible: false })
-    );
-    pointGroup.add(interactionSphere);
-
-    // Position the group on the sphere
-    const sphereRadius = 1.6;
-    pointGroup.position.x = sphereRadius * Math.sin(position.phi) * Math.cos(position.theta);
-    pointGroup.position.y = sphereRadius * Math.sin(position.phi) * Math.sin(position.theta);
-    pointGroup.position.z = sphereRadius * Math.cos(position.phi);
-
-    // Store project data
-    pointGroup.userData = {
-        ...project,
-        originalPosition: pointGroup.position.clone(),
-        particleMaterial: particleMaterial,
-        destructionFactor: 0,
-        hoverFactor: 0,
-        isHovered: false,
-        isClicked: false,
-        movementOffset: Math.random() * 2 * Math.PI
-    };
-
-    return pointGroup;
 };
 
 // Variables for morphing logic
@@ -813,37 +853,36 @@ const animate = async () => {
     m = scrollPosition / 5929 + 0.01;
     n = z - 2;
 
-    // Update particle animations
-    projectPoints.children.forEach(pointGroup => {
-        const userData = pointGroup.userData;
-        const material = userData.particleMaterial;
+    // Update instanced particles
+    if (instancedParticleSystem) {
+        instancedParticleSystem.material.uniforms.time.value = now * 0.00001;
 
-        // Slow breathing movement for each point
-        const timeFactor = (now * 0.0005) + userData.movementOffset;
-        const movementScale = 0.05 * Math.sin(timeFactor);
+        instancedInteractionGroups.forEach((group, i) => {
+            const userData = group.userData;
+            const idx = userData.instanceIndex;
 
-        // Optimize: Modifying position in-place instead of creating new Vector3 with clone()
-        pointGroup.position.copy(userData.originalPosition).multiplyScalar(1 + movementScale);
+            // Slow breathing movement for each point
+            const timeFactor = (now * 0.0005) + userData.movementOffset;
+            const movementScale = 0.05 * Math.sin(timeFactor);
+            group.position.copy(userData.originalPosition).multiplyScalar(1 + movementScale);
 
-        if (material && material.uniforms) {
-            material.uniforms.time.value = now * 0.00001;
-
-            // Hover animation
+            // Update instanced attributes
             if (userData.isHovered && userData.hoverFactor < 1.0) {
                 userData.hoverFactor += 0.1;
             } else if (!userData.isHovered && userData.hoverFactor > 0.0) {
                 userData.hoverFactor -= 0.1;
             }
-            material.uniforms.hoverFactor.value = userData.hoverFactor;
+            particleHoverFactors[idx] = userData.hoverFactor;
 
-            // Click destruction
             if (userData.isClicked && userData.destructionFactor < 3.0) {
                 userData.destructionFactor += 0.1;
             }
+            particleDestructionFactors[idx] = userData.destructionFactor;
+        });
 
-            material.uniforms.destructionFactor.value = userData.destructionFactor;
-        }
-    });
+        instancedParticleSystem.geometry.attributes.aHoverFactor.needsUpdate = true;
+        instancedParticleSystem.geometry.attributes.aDestructionFactor.needsUpdate = true;
+    }
 
     if (Renderer) {
         Renderer.render(SCENE, CAMERA);
@@ -1085,7 +1124,7 @@ const createVideoTexture = (videoFilename) => {
 
     // 2. Create Video Texture
     const videoTexture = new THREE.VideoTexture(video);
-    videoTexture.colorSpace = THREE.SRGBColorSpace; // Modern Three.js color fix
+    videoTexture.encoding = THREE.sRGBEncoding; // Compatibility for v0.124.0
     videoTexture.minFilter = THREE.LinearFilter;
     videoTexture.magFilter = THREE.LinearFilter;
 

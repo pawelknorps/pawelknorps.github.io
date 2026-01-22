@@ -22,6 +22,13 @@ class AudioSystem {
             delay: 200,
             feedback: 30
         };
+
+        // Throttling
+        this.lastCallTimes = {
+            drag: 0,
+            hover: 0,
+            click: 0
+        };
     }
 
     async init() {
@@ -272,6 +279,10 @@ class AudioSystem {
     playDragSound() {
         if (!this.isInitialized) return;
 
+        const now = performance.now();
+        if (now - this.lastCallTimes.drag < 80) return; // Throttle to ~12 calls/sec
+        this.lastCallTimes.drag = now;
+
         const currentTime = this.audioContext.currentTime;
 
         // Experimental granular drag sound
@@ -391,6 +402,10 @@ class AudioSystem {
 
     playHoverSound() {
         if (!this.isInitialized) return;
+
+        const now = performance.now();
+        if (now - this.lastCallTimes.hover < 150) return; // Throttle hover sounds
+        this.lastCallTimes.hover = now;
 
         const currentTime = this.audioContext.currentTime;
 

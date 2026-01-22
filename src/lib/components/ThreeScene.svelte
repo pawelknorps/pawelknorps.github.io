@@ -14,14 +14,19 @@
     let preloadedImage;
 
     // Preload main image
+    // Preload main image using ImageBitmap for faster GPU upload
     if (typeof window !== "undefined") {
-        preloadedImage = new Image();
-        preloadedImage.crossOrigin = "anonymous";
-        preloadedImage.onload = () =>
-            console.log("Main image preloaded successfully");
-        preloadedImage.onerror = (e) =>
-            console.warn("Main image preload failed:", e);
-        preloadedImage.src = `${base}/my-photo.webp`;
+        fetch(`${base}/my-photo.webp`)
+            .then((res) => res.blob())
+            .then((blob) => createImageBitmap(blob))
+            .then((bitmap) => {
+                preloadedImage = bitmap;
+                console.log("Main image preloaded as ImageBitmap");
+                if (ThreeModule && sceneInitialized) {
+                    ThreeModule.setInitialTexture(bitmap);
+                }
+            })
+            .catch((e) => console.warn("ImageBitmap preload failed:", e));
     }
 
     // Brightness sampling logic
@@ -77,11 +82,7 @@
 
             ThreeModule = await import("$lib/ThreeObject.js");
 
-            if (
-                preloadedImage &&
-                preloadedImage.complete &&
-                preloadedImage.naturalWidth > 0
-            ) {
+            if (preloadedImage) {
                 console.log("Using preloaded image");
                 ThreeModule.setInitialTexture(preloadedImage);
             } else {
@@ -113,7 +114,7 @@
 
             function startBrightnessSampling() {
                 function sampleLoop() {
-                    if (frameCount % 10 === 0) {
+                    if (frameCount % 60 === 0) {
                         sampleCanvasBrightness();
                     }
                     frameCount++;

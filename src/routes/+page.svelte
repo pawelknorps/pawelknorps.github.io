@@ -9,10 +9,6 @@
 	import SocialBubbles from "$lib/components/SocialBubbles.svelte";
 	import ProjectsSection from "$lib/components/ProjectsSection.svelte";
 	import BiographicalSection from "$lib/components/BiographicalSection.svelte";
-	import AudioControls from "$lib/components/AudioControls.svelte";
-
-	// Import audio system
-	import { audioSystem } from "$lib/AudioSystem.js";
 
 	// 🚀 Ta zmienna przychodzi z load()
 	export let data; // SvelteKit domyślnie przekazuje `data` z load()
@@ -25,6 +21,7 @@
 
 	// Lazy Loading State
 	let ThreeComponent;
+	let AudioControlsComponent;
 	let sceneReady = false;
 	let threeSceneInstance;
 
@@ -43,8 +40,7 @@
 	let adaptiveSubTextClass = "text-gray-300";
 
 	// Breakpoint for bio visibility
-	$: showBio = innerWidth >= 1300; // Show bio only on xl screens and larger
-	$: projectsHeight = 0;
+	$: showBio = innerWidth >= 1200;
 
 	// Handle brightness updates from ThreeScene
 	function handleBrightnessChange(event) {
@@ -68,8 +64,6 @@
 
 	// Audio state tracking
 	let isAudioEnabled = false;
-	let showVideo = false; // State for "STAN WODY" video background
-	let videoElement; // Reference to the video element
 
 	onMount(async () => {
 		// Wait for DOM to be ready
@@ -89,8 +83,12 @@
 
 		// Optimize TBT: Wait for browser to be idle before importing heavy 3D component
 		const loadComponent = async () => {
-			const module = await import("$lib/components/ThreeScene.svelte");
-			ThreeComponent = module.default;
+			const [threeModule, audioControlsModule] = await Promise.all([
+				import("$lib/components/ThreeScene.svelte"),
+				import("$lib/components/AudioControls.svelte")
+			]);
+			ThreeComponent = threeModule.default;
+			AudioControlsComponent = audioControlsModule.default;
 		};
 
 		if ("requestIdleCallback" in window) {
@@ -104,15 +102,6 @@
 		isAudioEnabled = true;
 	};
 
-	const toggleVideo = () => {
-		isAudioEnabled = true;
-
-		if (showVideo && videoElement) {
-			videoElement.pause();
-		}
-
-		showVideo = !showVideo;
-	};
 </script>
 
 <svelte:head>
@@ -184,6 +173,8 @@
 
 <!-- Scene Container for LCP and CLS optimization -->
 <div class="scene-container fixed top-0 left-0 w-full h-full z-0">
+	<div class="atmosphere-layer"></div>
+	<div class="grain-layer"></div>
 	{#if !sceneReady}
 		<img
 			src="{base}/scene-poster.webp"
@@ -211,7 +202,7 @@
 </div>
 
 <!-- Simple audio enable notice - top center -->
-{#if sceneReady && !isAudioEnabled && !showVideo}
+{#if sceneReady && !isAudioEnabled}
 	<div
 		class="audio-notice fixed top-16 left-1/2 transform -translate-x-1/2 z-50 bg-black/80 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm border border-white/20 transition-all duration-300"
 	>
@@ -219,16 +210,16 @@
 	</div>
 {/if}
 
-<AudioControls />
+{#if AudioControlsComponent}
+	<svelte:component this={AudioControlsComponent} />
+{/if}
 <SocialBubbles />
 
 <!-- Seamless flowing content -->
 <div class="seamless-flow">
-	<HeroSection {adaptiveTextClass} {adaptiveSubTextClass} />
+	<HeroSection {adaptiveTextClass} />
 	<!-- Projects naturally flowing from bottom of page with biographical text -->
-	<div
-		class="projects-flow relative w-full px-4 md:px-8 xl:px-16 2xl:px-24 content-visibility-auto"
-	>
+	<div class="projects-flow relative w-full px-4 md:px-8 xl:px-16 2xl:px-24 content-visibility-auto">
 		<!-- Centered column on mobile, row on xl+ -->
 		<div
 			class="flex flex-col items-center xl:items-start xl:flex-row gap-16 2xl:gap-24"
@@ -236,7 +227,6 @@
 			<!-- Left side - Projects -->
 			<div
 				class="projects-container w-full max-w-full xl:max-w-none xl:w-1/2"
-				bind:clientHeight={projectsHeight}
 			>
 				<ProjectsSection
 					{musicProjects}
@@ -260,7 +250,6 @@
 					<BiographicalSection
 						{scrollY}
 						{innerHeight}
-						{projectsHeight}
 						{adaptiveTextClass}
 						{adaptiveSubTextClass}
 					/>
@@ -271,11 +260,6 @@
 </div>
 
 <style>
-	/* Smooth scrolling */
-	html {
-		scroll-behavior: smooth;
-	}
-
 	/* Seamless flow container */
 	.seamless-flow {
 		background: transparent;
@@ -295,6 +279,8 @@
 	/* Simple audio notice */
 	.audio-notice {
 		animation: gentlePulse 2s ease-in-out infinite;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
 	}
 
 	@keyframes gentlePulse {
@@ -314,6 +300,18 @@
 		}
 	}
 
+	@media (max-width: 900px) {
+		.audio-notice {
+			top: 1.5rem;
+			font-size: 0.68rem;
+			padding: 0.45rem 0.7rem;
+		}
+		.projects-flow {
+			padding-left: 0.9rem;
+			padding-right: 0.9rem;
+		}
+	}
+
 	/* Text selection styling */
 	::selection {
 		background-color: #ff0080;
@@ -323,6 +321,40 @@
 		background: linear-gradient(-45deg, #0f0f0f, #1a1a1a, #2a2a2a, #3a3a3a);
 		background-size: 400% 400%;
 		animation: gradient-animation 15s ease infinite;
+	}
+
+	.atmosphere-layer {
+		position: absolute;
+		inset: 0;
+		background:
+			radial-gradient(circle at 20% 20%, rgba(255, 0, 128, 0.2), transparent 50%),
+			radial-gradient(circle at 80% 35%, rgba(0, 183, 255, 0.16), transparent 45%),
+			radial-gradient(circle at 50% 85%, rgba(255, 140, 0, 0.14), transparent 52%);
+		filter: blur(20px);
+		animation: atmosphere-drift 18s ease-in-out infinite alternate;
+		z-index: 2;
+		pointer-events: none;
+	}
+
+	.grain-layer {
+		position: absolute;
+		inset: 0;
+		opacity: 0.1;
+		background-image:
+			radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.2) 1px, transparent 0);
+		background-size: 3px 3px;
+		mix-blend-mode: soft-light;
+		z-index: 3;
+		pointer-events: none;
+	}
+
+	@keyframes atmosphere-drift {
+		0% {
+			transform: translate3d(-2%, -1%, 0) scale(1);
+		}
+		100% {
+			transform: translate3d(2%, 1%, 0) scale(1.06);
+		}
 	}
 
 	@keyframes gradient-animation {

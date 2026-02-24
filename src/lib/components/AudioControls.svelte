@@ -140,13 +140,9 @@
 {#if visible}
     <div
         class="audio-controls fixed bottom-4 left-1/2 transform -translate-x-1/2 md:right-8 md:top-1/2 md:bottom-auto md:left-auto md:translate-x-0 md:-translate-y-1/2 z-[9999] flex flex-col items-end gap-2 pointer-events-auto select-none"
+        role="group"
+        aria-label="Audio controls"
         in:fly={{ x: 50, duration: 1000 }}
-        on:mousedown|stopPropagation
-        on:mouseup|stopPropagation={onMouseUp}
-        on:touchstart|stopPropagation
-        on:touchend|stopPropagation={onMouseUp}
-        on:click|stopPropagation
-        on:mousemove|stopPropagation
     >
         <!-- Toggle Button -->
         <button
@@ -177,12 +173,14 @@
                     <div
                         class="control-group group flex flex-col items-center w-5"
                     >
-                        <div
+                        <button
+                            type="button"
                             class="slider-container h-24 w-full bg-white/5 rounded-full relative cursor-pointer touch-none overflow-hidden group-hover:bg-white/10 transition-colors"
                             on:mousedown={(e) =>
                                 startDrag(e, slider.id, slider.min, slider.max)}
                             on:touchstart={(e) =>
                                 startDrag(e, slider.id, slider.min, slider.max)}
+                            aria-label={`Adjust ${slider.label}`}
                         >
                             <div
                                 class="absolute bottom-0 left-0 w-full bg-white/80 group-hover:bg-[#FF0080] transition-colors"
@@ -190,7 +188,7 @@
                                     (slider.max - slider.min)) *
                                     100}%"
                             ></div>
-                        </div>
+                        </button>
                         <div
                             class="label text-[7px] font-bold tracking-wider text-white/40 mt-2 text-center group-hover:text-white transition-colors"
                         >

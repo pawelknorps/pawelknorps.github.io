@@ -1,7 +1,6 @@
 <script>
 	export let scrollY;
 	export let innerHeight;
-	export let projectsHeight;
 	export let adaptiveTextClass;
 	export let adaptiveSubTextClass;
 
@@ -81,14 +80,18 @@
 
 	.bio-flow-container {
 		position: relative;
-		margin-top: 20rem;
+		margin-top: 16rem;
 		top: 2rem;
 		padding: 2rem;
 		transition: opacity 0.9s cubic-bezier(0.4, 0, 0.2, 1);
-		backdrop-filter: blur(3px);
-		background: rgba(0, 0, 0, 0.1);
+		backdrop-filter: blur(10px);
+		background: linear-gradient(
+			150deg,
+			rgba(14, 14, 20, 0.48),
+			rgba(6, 6, 10, 0.24)
+		);
 		border-left: 1px solid rgba(255, 255, 255, 0.1);
-		border-radius: 12px;
+		border-radius: 18px;
 		display: flex;
 		flex-direction: column;
 		justify-content: flex-start;
@@ -106,41 +109,15 @@
 
 	.bio-text p {
 		text-align: justify;
-		font-family: system-ui, -apple-system, sans-serif;
+		font-family: "Space Grotesk", system-ui, -apple-system, sans-serif;
 		font-weight: 300;
 		line-height: 1.8;
 		margin-bottom: 1rem;
-		padding-right: 3rem;
+		padding-right: 1rem;
 	}
 
 	.bio-text span {
 		font-weight: 600;
-	}
-
-	.achievements-section {
-		border-top: 1px solid rgba(255, 0, 128, 0.2);
-		padding-top: 1rem;
-		margin-top: 1rem;
-	}
-
-	.achievements-list {
-		max-height: none;
-	}
-
-	.achievement-item {
-		padding: 1rem 0;
-		border-left: 3px solid rgba(255, 0, 128, 0.3);
-		padding-left: 1.5rem;
-		margin-left: 0.75rem;
-		transition: all 0.3s ease;
-		line-height: 1.6;
-	}
-
-	.achievement-item:hover {
-		border-left-color: rgba(255, 0, 128, 0.8);
-		padding-left: 2rem;
-		background: rgba(255, 0, 128, 0.05);
-		border-radius: 0 8px 8px 0;
 	}
 
 	/* Custom scrollbar for bio text */
@@ -185,6 +162,14 @@
 		.bio-text {
 			font-size: 1.125rem;
 			line-height: 1.9;
+		}
+	}
+
+	@media (max-width: 1535px) {
+		.bio-flow-container {
+			margin-top: 8rem;
+			padding: 1.2rem;
+			top: 0.5rem;
 		}
 	}
 </style>

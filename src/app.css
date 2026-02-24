@@ -1,15 +1,33 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700&family=Syne:wght@600;700;800&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+:root {
+	--bg-0: #050507;
+	--bg-1: #0c0b10;
+	--ink: #f7f7fa;
+	--accent-1: #ff007a;
+	--accent-2: #0cc6ff;
+}
+
 /* Smooth Scroll */
 html { scroll-behavior: smooth; }
+body {
+	font-family: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif;
+	background: radial-gradient(circle at top, var(--bg-1), var(--bg-0) 65%);
+	color: var(--ink);
+}
+h1, h2, h3, .display-font {
+	font-family: "Syne", "Space Grotesk", sans-serif;
+}
 
 /* Scroll Bar */
 :root::-webkit-scrollbar { width: 0.25rem; }
 :root::-webkit-scrollbar-track { background: transparent; }
 :root::-webkit-scrollbar-thumb { background: #696969; }
-:root::-webkit-scrollbar-thumb:hover { background: #FF0080; }
+:root::-webkit-scrollbar-thumb:hover { background: var(--accent-1); }
 
 /* Performance Optimizations */
 .content-visibility-auto {

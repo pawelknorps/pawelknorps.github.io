@@ -1,9 +1,29 @@
 import * as THREE from 'three';
 import { TextureLoader } from 'three';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { base } from '$app/paths';
-import { audioSystem } from '$lib/AudioSystem.js';
-
 import { browser } from '$app/environment';
+
+let audioSystem = {
+    isInitialized: false,
+    init: async () => { },
+    playDragSound: () => { },
+    playHoverSound: () => { },
+    playClickSound: () => { },
+    playMorphSound: () => { },
+    getAnalysis: () => ({ low: 0, mid: 0, high: 0 })
+};
+let isAudioSystemLoaded = false;
+
+const loadAudioSystem = async () => {
+    if (isAudioSystemLoaded) return audioSystem;
+    const module = await import('$lib/AudioSystem.js');
+    audioSystem = module.audioSystem;
+    isAudioSystemLoaded = true;
+    return audioSystem;
+};
 
 // Create a new TextureLoader
 let loader;
@@ -113,7 +133,14 @@ export const loadTextures = () => {
 };
 
 let Renderer;
+let composer = null;
+let bloomPass = null;
 const SCENE = new THREE.Scene();
+let sceneCanvas = null;
+let animationFrameId = null;
+let isSceneDestroyed = false;
+let maxDevicePixelRatio = 1.75;
+let scrollNorm = 0;
 let n = 0.2;
 
 // Drag controls variables
@@ -227,15 +254,13 @@ directionalLight2.position.set(-1, 0, 1);
 SCENE.add(directionalLight2);
 SCENE.add(directionalLight);
 
-let z = 5;
-let m = 0.2;
 let CAMERA;
 if (browser) {
-    CAMERA = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, m, z);
+    CAMERA = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.2, 16);
 } else {
-    CAMERA = new THREE.PerspectiveCamera(75, 1, m, z);
+    CAMERA = new THREE.PerspectiveCamera(75, 1, 0.2, 16);
 }
-CAMERA.position.z = 2.2;
+CAMERA.position.set(0, 0, 2.3);
 
 const projectPoints = new THREE.Group();
 SCENE.add(projectPoints);
@@ -739,6 +764,8 @@ let lastMorphSoundTime = 0;
 // Scroll tracking
 const updateScrollPosition = () => {
     scrollPosition = window.pageYOffset || document.documentElement.scrollTop;
+    const viewportHeight = window.innerHeight || 1;
+    scrollNorm = Math.min(scrollPosition / (viewportHeight * 2.2), 1);
     const scrollMultiplier = 1 + (scrollPosition / 1000) * 2;
     morphSpeed = baseMorphSpeed * Math.min(scrollMultiplier, 5);
 };
@@ -748,7 +775,8 @@ if (browser) {
 }
 
 const animate = async () => {
-    requestAnimationFrame(animate);
+    if (isSceneDestroyed) return;
+    animationFrameId = requestAnimationFrame(animate);
 
     const now = performance.now();
 
@@ -849,9 +877,20 @@ const animate = async () => {
     projectPoints.rotation.x = sphereRotation.x + autoRotationX;
     projectPoints.rotation.y = sphereRotation.y + autoRotationY;
 
-    z = scrollPosition / 60 + 2;
-    m = scrollPosition / 5929 + 0.01;
-    n = z - 2;
+    // Scroll choreography: cinematic dolly + slight orbit drift
+    const targetCamZ = 2.25 + scrollNorm * 1.8;
+    const targetCamY = 0.06 + scrollNorm * 0.36;
+    const targetCamX = Math.sin(now * 0.00017) * 0.08;
+    CAMERA.position.z += (targetCamZ - CAMERA.position.z) * 0.025;
+    CAMERA.position.y += (targetCamY - CAMERA.position.y) * 0.03;
+    CAMERA.position.x += (targetCamX - CAMERA.position.x) * 0.02;
+    CAMERA.lookAt(0, 0, 0);
+
+    n = 0.2 + scrollNorm * 0.95;
+    if (bloomPass) {
+        bloomPass.strength = 0.45 + scrollNorm * 0.55;
+        bloomPass.radius = 0.3 + scrollNorm * 0.2;
+    }
 
     // Update instanced particles
     if (instancedParticleSystem) {
@@ -884,17 +923,23 @@ const animate = async () => {
         instancedParticleSystem.geometry.attributes.aDestructionFactor.needsUpdate = true;
     }
 
-    if (Renderer) {
+    if (composer) {
+        composer.render();
+    } else if (Renderer) {
         Renderer.render(SCENE, CAMERA);
     }
 };
 
 export const resize = async () => {
     if (Renderer) {
-        Renderer.setPixelRatio(window.devicePixelRatio);
+        const ratio = Math.min(window.devicePixelRatio || 1, maxDevicePixelRatio);
+        Renderer.setPixelRatio(ratio);
         Renderer.setSize(window.innerWidth, window.innerHeight);
         CAMERA.aspect = window.innerWidth / window.innerHeight;
         CAMERA.updateProjectionMatrix();
+        if (composer) {
+            composer.setSize(window.innerWidth, window.innerHeight);
+        }
 
     }
 };
@@ -906,9 +951,9 @@ const onMouseDown = (event) => {
     console.log('Mouse down detected at:', event.clientX, event.clientY);
 
     // Initialize audio on first user interaction
-    if (!audioSystem.isInitialized) {
-        audioSystem.init();
-    }
+    loadAudioSystem().then((system) => {
+        if (!system.isInitialized) system.init();
+    }).catch(() => { });
 
     isDragging = true;
     hasMovedWhileDragging = false;
@@ -1124,7 +1169,7 @@ const createVideoTexture = (videoFilename) => {
 
     // 2. Create Video Texture
     const videoTexture = new THREE.VideoTexture(video);
-    videoTexture.encoding = THREE.sRGBEncoding; // Compatibility for v0.124.0
+    videoTexture.colorSpace = THREE.SRGBColorSpace;
     videoTexture.minFilter = THREE.LinearFilter;
     videoTexture.magFilter = THREE.LinearFilter;
 
@@ -1162,8 +1207,23 @@ const createCinemaBackground = (videoFilename) => {
 };
 
 export const setScene = async (canvas) => {
+    isSceneDestroyed = false;
+    sceneCanvas = canvas;
     Renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+    Renderer.outputColorSpace = THREE.SRGBColorSpace;
     Renderer.setClearColor(0x000000, 0); // Transparent background
+    maxDevicePixelRatio = window.innerWidth < 820 ? 1.15 : 1.75;
+
+    // Postprocessing pipeline for a cinematic look.
+    composer = new EffectComposer(Renderer);
+    composer.addPass(new RenderPass(SCENE, CAMERA));
+    bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(window.innerWidth, window.innerHeight),
+        0.55,
+        0.35,
+        0.82
+    );
+    composer.addPass(bloomPass);
 
     // --- Background Cinema Setup ---
     // Make sure 'demo.mp4' exists in your 'static' folder!
@@ -1187,11 +1247,6 @@ export const setScene = async (canvas) => {
     canvas.addEventListener('touchmove', onTouchMove, { passive: false });
     canvas.addEventListener('touchend', onTouchEnd, { passive: false });
 
-    // Test event binding
-    canvas.addEventListener('mouseenter', () => {
-        console.log('Mouse entered canvas - events are working!');
-    });
-
     console.log('Scene initialized with drag controls');
 
     // Async Shader Compilation to avoid freezing the main thread
@@ -1203,5 +1258,40 @@ export const setScene = async (canvas) => {
     }
 
     await resize();
-    await animate();
+    animate();
+};
+
+export const destroyScene = () => {
+    isSceneDestroyed = true;
+
+    if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+    }
+
+    if (browser) {
+        window.removeEventListener('resize', resize);
+        window.removeEventListener('scroll', updateScrollPosition);
+    }
+
+    if (sceneCanvas) {
+        sceneCanvas.removeEventListener('mousedown', onMouseDown);
+        sceneCanvas.removeEventListener('touchstart', onTouchStart);
+        sceneCanvas.removeEventListener('touchmove', onTouchMove);
+        sceneCanvas.removeEventListener('touchend', onTouchEnd);
+    }
+
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+
+    if (Renderer) {
+        Renderer.dispose();
+        Renderer = null;
+    }
+    if (composer) {
+        composer.dispose();
+        composer = null;
+    }
+    bloomPass = null;
+    sceneCanvas = null;
 };

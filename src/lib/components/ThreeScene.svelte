@@ -1,5 +1,5 @@
 <script>
-    import { onMount, createEventDispatcher } from "svelte";
+    import { onMount, onDestroy, createEventDispatcher } from "svelte";
     import { base } from "$app/paths";
 
     export let musicProjects = [];
@@ -12,6 +12,7 @@
     let ThreeModule;
     let sceneInitialized = false;
     let preloadedImage;
+    let stopBrightnessSampling = () => {};
 
     // Preload main image
     // Preload main image using ImageBitmap for faster GPU upload
@@ -123,15 +124,12 @@
                 sampleLoop();
             }
 
-            function stopBrightnessSampling() {
+            stopBrightnessSampling = () => {
                 cancelAnimationFrame(brightnessInterval);
-            }
+            };
 
             startBrightnessSampling();
 
-            return () => {
-                stopBrightnessSampling();
-            };
         } catch (error) {
             console.error("Failed to initialize scene:", error);
         }
@@ -140,6 +138,13 @@
     onMount(async () => {
         if (ThreeObject) {
             await initializeScene();
+        }
+    });
+
+    onDestroy(() => {
+        stopBrightnessSampling();
+        if (ThreeModule?.destroyScene) {
+            ThreeModule.destroyScene();
         }
     });
 

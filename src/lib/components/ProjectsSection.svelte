@@ -166,7 +166,7 @@
 
 			<div
 				id="music-{i}"
-				class="group my-20 translate-y-0 hover:-translate-y-8 duration-[400ms] ease-in-out w-full md:w-[40rem] lg:w-[30rem] xl:w-[48rem] 2xl:w-[56rem] project-card pointer-events-auto"
+				class="group my-14 md:my-20 translate-y-0 md:hover:-translate-y-4 xl:hover:-translate-y-6 duration-[400ms] ease-in-out w-full md:w-[40rem] lg:w-[30rem] xl:w-[48rem] 2xl:w-[56rem] project-card pointer-events-auto"
 				in:fade={{ delay: 250 * i, duration: 1000 }}
 			>
 				{#if youtubeId}
@@ -289,6 +289,7 @@
 							>
 								{#if loadedVideos[`facebook-${i}`]}
 									<iframe
+										title={`Facebook video: ${data.title}`}
 										src="https://www.facebook.com/plugins/video.php?href={encodeURIComponent(
 											facebookUrl,
 										)}&show_text=false&t=0"
@@ -383,6 +384,7 @@
 						>
 							{#if loadedVideos[`soundcloud-${i}`]}
 								<iframe
+									title={`SoundCloud player: ${data.title}`}
 									width="100%"
 									height="166"
 									scrolling="no"
@@ -546,7 +548,7 @@
 		{#each programmingProjects as data, i}
 			<div
 				id="programming-{i}"
-				class="group my-20 translate-y-0 hover:-translate-y-8 duration-[400ms] ease-in-out w-full md:w-[40rem] lg:w-[30rem] xl:w-[48rem] 2xl:w-[56rem] project-card pointer-events-auto"
+				class="group my-14 md:my-20 translate-y-0 md:hover:-translate-y-4 xl:hover:-translate-y-6 duration-[400ms] ease-in-out w-full md:w-[40rem] lg:w-[30rem] xl:w-[48rem] 2xl:w-[56rem] project-card pointer-events-auto"
 				in:fade={{
 					delay: 250 * (i + musicProjects.length),
 					duration: 1000,
@@ -640,21 +642,20 @@
 		background: transparent;
 	}
 
-	/* Enhanced project interactions */
-	.project-group .group:hover {
-		transform: translateY(-2rem) scale(1.02);
-	}
-
 	/* Project card highlight animation */
 	.project-card {
 		will-change: transform;
 		transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-		border-radius: 16px;
+		border-radius: 18px;
 		padding: 1.5rem;
 		position: relative;
 		backdrop-filter: blur(12px);
 		-webkit-backdrop-filter: blur(12px);
-		background: rgba(20, 20, 20, 0.4);
+		background: linear-gradient(
+			160deg,
+			rgba(20, 20, 20, 0.58),
+			rgba(10, 10, 14, 0.38)
+		);
 		border: 1px solid rgba(255, 255, 255, 0.08);
 		box-shadow:
 			0 4px 24px -1px rgba(0, 0, 0, 0.2),
@@ -716,5 +717,13 @@
 		text-shadow:
 			0 0 10px rgba(0, 0, 0, 0.5),
 			0 1px 2px rgba(0, 0, 0, 0.3);
+	}
+
+	@media (max-width: 900px) {
+		.project-card {
+			padding: 1rem;
+			border-radius: 14px;
+			backdrop-filter: blur(8px);
+		}
 	}
 </style>

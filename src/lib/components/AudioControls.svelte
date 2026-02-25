@@ -21,40 +21,16 @@
     let draggingParam = null;
 
     onMount(() => {
-        // Randomize defaults slightly (+/- 20% or within reasonable bounds)
-        const randomize = (val, min, max, variation = 0.2) => {
-            const range = max - min;
-            const delta = range * variation * (Math.random() * 2 - 1);
-            return Math.max(min, Math.min(max, val + delta));
-        };
-
-        windowMs = randomize(100, 1, 1000);
-        chorus = randomize(20, 0, 100);
-        delayMs = randomize(200, 0, 2000);
-        feedback = randomize(30, 0, 95);
-        mix = randomize(50, 0, 100);
-        pitchvol = randomize(70, 0, 100);
-        revvol = randomize(50, 0, 100);
-        octdamp = randomize(20, 0, 100);
-        octvol = randomize(60, 0, 100);
-
-        // Apply initial randomized values
-        updateParam("window", windowMs);
-        updateParam("chorus", chorus);
-        updateParam("delay", delayMs);
-        updateParam("feedback", feedback);
-        updateParam("mix", mix);
-        updateParam("pitchvol", pitchvol);
-        updateParam("revvol", revvol);
-        updateParam("octdamp", octdamp);
-        updateParam("octvol", octvol);
-
-        // Hidden parameters (randomized only)
-        updateParam("decay", randomize(50, 0, 100));
-        updateParam("size", randomize(50, 0, 100));
-        updateParam("damp", randomize(50, 0, 100));
-        updateParam("jitter", randomize(20, 0, 50)); // Lower range for jitter to avoid glitchiness
-        updateParam("diff", randomize(50, 0, 100));
+        const profile = audioSystem.getUserSoundProfile?.() || {};
+        windowMs = Number(profile.window ?? windowMs);
+        chorus = Number(profile.chorus ?? chorus);
+        delayMs = Number(profile.delay ?? delayMs);
+        feedback = Number(profile.feedback ?? feedback);
+        mix = Number(profile.mix ?? mix);
+        pitchvol = Number(profile.pitchvol ?? pitchvol);
+        revvol = Number(profile.revvol ?? revvol);
+        octdamp = Number(profile.octdamp ?? octdamp);
+        octvol = Number(profile.octvol ?? octvol);
 
         // Fade in controls after a delay
         setTimeout(() => (visible = true), 1000);

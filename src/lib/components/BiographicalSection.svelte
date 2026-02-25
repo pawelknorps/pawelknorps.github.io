@@ -4,7 +4,6 @@
 
 	export let scrollY;
 	export let innerHeight;
-	export let adaptiveTextClass;
 	export let adaptiveSubTextClass;
 	export let bioProjectionEnabled = false;
 

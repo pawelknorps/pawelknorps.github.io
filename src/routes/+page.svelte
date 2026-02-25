@@ -1,32 +1,46 @@
+<svelte:head>
+    <title>Paweł Knorps - Composer Guitarist Portfolio</title>
+    <meta name="description" content="Portfolio of Paweł Knorps, a composer, guitarist, basist, producer." />
+    <link rel="canonical" href="https://pawelknorps.github.io/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://pawelknorps.github.io/" />
+    <meta property="og:title" content="Paweł Knorps - Composer Guitarist Portfolio" />
+    <meta property="og:description" content="Portfolio of Paweł Knorps, a composer, guitarist, basist, producer." />
+    <meta property="og:image" content="https://pawelknorps.github.io/og-image.png" />
+
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://pawelknorps.github.io/" />
+    <meta property="twitter:title" content="Paweł Knorps - Composer Guitarist Portfolio" />
+    <meta property="twitter:description" content="Portfolio of Paweł Knorps, a composer, guitarist, basist, producer." />
+    <meta property="twitter:image" content="https://pawelknorps.github.io/og-image.png" />
+</svelte:head>
 <script>
 	// Library Imports
-	import { setScene, updateProjects, setBioProjectionEnabled, setProjectOpenHandler, setProjectedVideo, clearProjectedVideo } from '$lib/ThreeObject.js';
-	import { onMount, tick } from 'svelte';
+	import { setScene, updateProjects, setBioProjectionEnabled, setProjectOpenHandler, setProjectedVideo, clearProjectedVideo, destroyScene } from '$lib/ThreeObject.js';
+	import { onMount, onDestroy, tick } from 'svelte';
 	
 	// Import components
 	import HeroSection from '$lib/components/HeroSection.svelte';
 	import SocialBubbles from '$lib/components/SocialBubbles.svelte';
+	import AudioControls from '$lib/components/AudioControls.svelte';
 	import ProjectsSection from '$lib/components/ProjectsSection.svelte';
 	import BiographicalSection from '$lib/components/BiographicalSection.svelte';
 	import ProjectMediaOverlay from '$lib/components/ProjectMediaOverlay.svelte';
 	import { resolveProjectMedia } from '$lib/utils/projectMedia.js';
+	import { audioSystem } from '$lib/AudioSystem.js';
 	
 
 	// 🚀 Ta zmienna przychodzi z load()
 	export let data; // SvelteKit domyślnie przekazuje `data` z load()
+	const portfolioData = data.portfolioData;
 
-	// Ensure portfolioData exists, otherwise default to empty objects to prevent crashes
-	const portfolioData = data?.portfolioData || {
-		musicProjects: [],
-		programmingProjects: [],
-	};
-
-	// Lazy Loading State
-	let ThreeComponent;
-	let sceneReady = false;
-	let threeSceneInstance;
-
+	// Create a new wavy sphere scene
+	let ThreeObject;
+	let sceneInitialized = false;
+	let sceneReady = false; // New state to track if the scene is loaded
 	// Project data
+	let personalData = {};
 	let musicProjects = [];
 	let programmingProjects = [];
 
@@ -34,16 +48,25 @@
 	let scrollY = 0;
 	let innerHeight = 0;
 	let innerWidth = 0;
-
+	
 	// Background brightness detection for text readability
 	let backgroundBrightness = 0.5; // Default middle brightness
-	let adaptiveTextClass = "text-white";
-	let adaptiveSubTextClass = "text-gray-300";
+	let adaptiveTextClass = 'text-white';
+	let adaptiveSubTextClass = 'text-gray-300';
 
 	let bioFocusEnabled = false;
 	let activeMedia = null;
+	let speechVoices = [];
+	let selectedNarrationVoice = null;
 	$: showBio = innerWidth >= 1300;
 	$: projectsHeight = 0;
+
+	const BIO_NARRATION_TEXT = `Paweł Knorps to artysta poruszający się między tradycją a eksploracją, oddany dźwiękowi jako sile przekraczającej granice. Absolwent gitary jazzowej poznańskiej Akademii Muzycznej oraz kompozycji jazzowej na Danish National Academy of Music w Odense. 
+	Jego muzyczna podróż skupia się wokół improwizacji, nie tylko na gitarze, ale również jako basista, producent i kompozytor. Poszukuje przestrzeni wolności, gdzie intuicja spotyka się z ryzykiem, a dźwięk staje się narracją.
+	Jego zespół Pawel Knorps Group, tworzony z wybitnymi poznańskimi muzykami, zdobył uznanie w finale Blue Note Competition 2024.
+	Jego alter ego, enthymeme, to świat elektronicznej improwizacji, w którym technologia spotyka się z ludzkim dotykiem.
+	Dziś po powrocie z Danii zasila wiele poznańskich projektów, od Milomi i SNY, przez Przesilenie i GānāVānā, po Aktas Erdogan Trio.
+	Każda z tych formacji jest przejawem niezaspokojonej ciekawości w poszukiwaniu własnej ekspresji.`;
 
 	const syncSceneFocus = () => {
 		setBioProjectionEnabled(bioFocusEnabled || !!activeMedia);
@@ -79,6 +102,48 @@
 		activeMedia = null;
 		clearProjectedVideo();
 		syncSceneFocus();
+	};
+
+	const setupNarrationVoice = () => {
+		if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+		speechVoices = window.speechSynthesis.getVoices();
+		if (speechVoices.length === 0) return;
+		selectedNarrationVoice =
+			speechVoices.find((voice) => voice.lang?.toLowerCase().startsWith('pl')) ||
+			speechVoices.find((voice) => voice.lang?.toLowerCase().startsWith('en')) ||
+			speechVoices[0];
+	};
+
+	const stopBioNarration = () => {
+		if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+		window.speechSynthesis.cancel();
+		audioSystem.clearNarrationPulses?.();
+	};
+
+	const startBioNarration = async () => {
+		if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+		if (!audioSystem.isInitialized) {
+			await audioSystem.init();
+		}
+		stopBioNarration();
+		const utterance = new SpeechSynthesisUtterance(BIO_NARRATION_TEXT);
+		utterance.rate = 0.95;
+		utterance.pitch = 0.96;
+		utterance.volume = 0.62;
+		utterance.lang = selectedNarrationVoice?.lang || 'pl-PL';
+		if (selectedNarrationVoice) {
+			utterance.voice = selectedNarrationVoice;
+		}
+		utterance.onboundary = (event) => {
+			audioSystem.emitNarrationPulse?.(event.charIndex, BIO_NARRATION_TEXT.length, event.name);
+		};
+		utterance.onend = () => {
+			audioSystem.clearNarrationPulses?.();
+		};
+		utterance.onerror = () => {
+			audioSystem.clearNarrationPulses?.();
+		};
+		window.speechSynthesis.speak(utterance);
 	};
 	
 	// Function to sample canvas brightness
@@ -154,11 +219,12 @@
 			ThreeObject.width = window.innerWidth;
 			ThreeObject.height = window.innerHeight;
 			
-			// Initialize the scene
-			await setScene(ThreeObject);
-			sceneInitialized = true;
-			
-			console.log('Scene initialized successfully');
+				// Initialize the scene
+				await setScene(ThreeObject);
+				sceneInitialized = true;
+				sceneReady = true;
+				
+				console.log('Scene initialized successfully');
 			
 			// Update projects if data is available
 			if (musicProjects.length > 0 || programmingProjects.length > 0) {
@@ -199,23 +265,27 @@
 
 	// Audio state tracking
 	let isAudioEnabled = false;
-	let showVideo = false; // State for "STAN WODY" video background
-	let videoElement; // Reference to the video element
 
+	// Sample brightness periodically
+	let brightnessInterval;
+	
 	onMount(async () => {
 		// Wait for DOM to be ready
 		await tick();
-		// ✅ portfolioData już jest z `load()`, nie fetchuj go ponownie
+		
+        // ✅ portfolioData już jest z `load()`, nie fetchuj go ponownie
 		if (portfolioData) {
+			personalData = portfolioData.personal;
 			musicProjects = portfolioData.musicProjects;
 			programmingProjects = portfolioData.programmingProjects;
-
-			console.log("Portfolio data loaded:", {
+			
+			console.log('Portfolio data loaded:', {
+				personal: !!personalData,
 				musicProjects: musicProjects.length,
-				programmingProjects: programmingProjects.length,
+				programmingProjects: programmingProjects.length
 			});
 		} else {
-			console.error("Brak danych portfolio");
+			console.error('Brak danych portfolio');
 		}
 		
 		// Wait a bit more for canvas to be available
@@ -228,14 +298,28 @@
 		}, 100);
 
 		setProjectOpenHandler((project) => openProjectMedia(project));
+		setupNarrationVoice();
+		if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+			window.speechSynthesis.onvoiceschanged = setupNarrationVoice;
+		}
 		
 			// Cleanup function
 			return () => {
 				if (brightnessInterval) {
 					cancelAnimationFrame(brightnessInterval);
 				}
+				stopBioNarration();
 			};
     });
+
+	onDestroy(() => {
+		if (brightnessInterval) {
+			cancelAnimationFrame(brightnessInterval);
+			brightnessInterval = null;
+		}
+		stopBioNarration();
+		destroyScene();
+	});
 		
 	// Add a manual initialization trigger for debugging
 	const handleCanvasClick = () => {
@@ -243,14 +327,17 @@
 			console.log('Manual scene initialization triggered');
 			initializeScene();
 		}
-	});
-
-	const handleAudioReq = () => {
+		// Audio will be initialized automatically in ThreeObject.js onMouseDown
 		isAudioEnabled = true;
 	};
 
 	const handleToggleBioFocus = () => {
 		bioFocusEnabled = !bioFocusEnabled;
+		if (bioFocusEnabled) {
+			void startBioNarration();
+		} else {
+			stopBioNarration();
+		}
 		if (!bioFocusEnabled) {
 			clearProjectedVideo();
 			activeMedia = null;
@@ -265,86 +352,9 @@
 
 </script>
 
-<svelte:head>
-	<title>Paweł Knorps - Composer Guitarist Portfolio</title>
-	<meta
-		name="description"
-		content="Portfolio of Paweł Knorps, a composer, guitarist, bassist, producer."
-	/>
-	<link rel="canonical" href="https://knorps.com/" />
-
-	<meta property="og:type" content="website" />
-	<meta property="og:url" content="https://knorps.com/" />
-	<meta
-		property="og:title"
-		content="Paweł Knorps - Composer Guitarist Portfolio"
-	/>
-	<meta
-		property="og:description"
-		content="Portfolio of Paweł Knorps, a composer, guitarist, bassist, producer."
-	/>
-	<meta
-		property="og:image"
-		content="https://knorps.com/my-photo2.webp"
-	/>
-
-	<meta property="twitter:card" content="summary_large_image" />
-	<meta property="twitter:url" content="https://knorps.com/" />
-	<meta
-		property="twitter:title"
-		content="Paweł Knorps - Composer Guitarist Portfolio"
-	/>
-	<meta
-		property="twitter:description"
-		content="Portfolio of Paweł Knorps, a composer, guitarist, bassist, producer."
-	/>
-	<meta
-		property="twitter:image"
-		content="https://knorps.com/my-photo2.webp"
-	/>
-	<meta name="robots" content="max-image-preview:large" />
-	<meta
-		property="og:image"
-		content="https://knorps.com/my-photo.webp"
-	/>
-	<meta property="og:image:width" content="1200" />
-	<meta property="og:image:height" content="1200" />
-	<meta property="og:type" content="profile" />
-
-	<script type="application/ld+json">
-		{
-			"@context": "https://schema.org",
-			"@type": "MusicGroup",
-			"name": "Paweł Knorps",
-			"url": "https://knorps.com/",
-			"image": "https://knorps.com/my-photo.webp",
-			"description": "Portfolio of Paweł Knorps, a composer, guitarist, bassist, producer.",
-			"jobTitle": ["Composer", "Guitarist", "Bassist", "Producer"],
-			"sameAs": [
-				"https://www.instagram.com/pawelknorps",
-				"https://www.facebook.com/pawelknorps",
-				"https://soundcloud.com/pawelknorps",
-				"https://www.youtube.com/@pawelknorps"
-			]
-		}
-	</script>
-</svelte:head>
-
 <svelte:window bind:scrollY bind:innerHeight bind:innerWidth />
-
-<!-- Scene Container for LCP and CLS optimization -->
-<div class="scene-container fixed top-0 left-0 w-full h-full z-0">
-	{#if !sceneReady}
-		<img
-			src="{base}/scene-poster.webp"
-			alt="3D Scene Preview"
-			class="poster absolute inset-0 w-full h-full object-cover z-10"
-			out:fade={{ duration: 1000 }}
-		/>
-		<!-- Fallback gradient if image fails or while loading -->
-		<div
-			class="absolute inset-0 w-full h-full gradient-placeholder -z-10"
-		></div>
+{#if !sceneReady}
+		<div class="fixed top-0 left-0 w-full h-full gradient-placeholder z-0"></div> 
 	{/if}
 
 	<canvas  
@@ -360,24 +370,16 @@
 <div class="audio-notice fixed top-6 left-1/2 transform -translate-x-1/2 z-50 bg-black/80 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm border border-white/20 transition-all duration-300">
 		 touch the sphere for audio
 </div>
-
-<!-- Simple audio enable notice - top center -->
-{#if sceneReady && !isAudioEnabled && !showVideo}
-	<div
-		class="audio-notice fixed top-16 left-1/2 transform -translate-x-1/2 z-50 bg-black/80 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm border border-white/20 transition-all duration-300"
-	>
-		touch the sphere for audio
-	</div>
 {/if}
 
 <SocialBubbles />
+<AudioControls />
 
 <!-- Seamless flowing content -->
 <div class="seamless-flow">
 	<HeroSection 
 		{personalData} 
 		{adaptiveTextClass} 
-		{adaptiveSubTextClass} 
 		{bioFocusEnabled}
 		on:toggleBioFocus={handleToggleBioFocus}
 	/>
@@ -404,8 +406,6 @@
 				<BiographicalSection
 					{scrollY}
 					{innerHeight}
-					{projectsHeight}
-					{adaptiveTextClass}
 					{adaptiveSubTextClass}
 					bioProjectionEnabled={bioFocusEnabled}
 					on:toggleBioProjection={handleToggleBioProjection}
@@ -424,14 +424,20 @@
 <div class="fixed bottom-4 left-4 z-50 bg-red-900/70 text-white px-3 py-2 rounded-lg text-sm backdrop-blur-sm">
 	⚠️ Scene not initialized - click canvas to retry
 </div>
+{/if} -->
 
 <style>
+	/* Smooth scrolling */
+	:global(html) {
+		scroll-behavior: smooth;
+	}
+
 	/* Seamless flow container */
 	.seamless-flow {
 		background: transparent;
 		position: relative;
 		z-index: 10; /* Higher z-index for content */
-		pointer-events: auto;
+		pointer-events: none;
 	}
 
 	/* Projects flow seamlessly */
@@ -439,7 +445,16 @@
 		background: transparent;
 		position: relative;
 		z-index: 15;
+		pointer-events: none;
+	}
+
+	.projects-container {
 		pointer-events: auto;
+	}
+
+	/* By default, let Three.js control all gestures */
+	canvas {
+	touch-action: none;
 	}
 
 	/* Simple audio notice */
@@ -448,13 +463,18 @@
 	}
 
 	@keyframes gentlePulse {
-		0%,
-		100% {
-			opacity: 0.9;
+		0%, 100% { opacity: 0.9; }
+		50% { opacity: 1; }
+	}
+
+	/* Responsive adjustments for mobile */
+	@media (max-width: 800px) {
+		.projects-container {
+			padding: 0 1rem;
 		}
-		50% {
-			opacity: 1;
-		}
+		canvas {
+		touch-action: pan-y;
+	}
 	}
 
 	/* Large screen adjustments */
@@ -466,26 +486,26 @@
 
 	/* Text selection styling */
 	::selection {
-		background-color: #ff0080;
+		background-color: #FF0080;
 		color: white;
 	}
-	.gradient-placeholder {
-		background: linear-gradient(-45deg, #0f0f0f, #1a1a1a, #2a2a2a, #3a3a3a);
-		background-size: 400% 400%;
-		animation: gradient-animation 15s ease infinite;
-	}
+	   .gradient-placeholder {
+        background: linear-gradient(-45deg, #0f0f0f, #1a1a1a, #2a2a2a, #3a3a3a);
+        background-size: 400% 400%;
+        animation: gradient-animation 15s ease infinite;
+    }
 
-	@keyframes gradient-animation {
-		0% {
-			background-position: 0% 50%;
-		}
-		50% {
-			background-position: 100% 50%;
-		}
-		100% {
-			background-position: 0% 50%;
-		}
-	}
+    @keyframes gradient-animation {
+        0% {
+            background-position: 0% 50%;
+        }
+        50% {
+            background-position: 100% 50%;
+        }
+        100% {
+            background-position: 0% 50%;
+        }
+    }
 
 	/* Remove any visual separations */
 	* {

@@ -3,7 +3,6 @@
 
 	export let personalData;
 	export let adaptiveTextClass;
-	export let adaptiveSubTextClass;
 	export let bioFocusEnabled = false;
 
 	const dispatch = createEventDispatcher();
@@ -71,7 +70,7 @@
 		background: transparent;
 		position: relative;
 		z-index: 40;
-		pointer-events: auto;
+		pointer-events: none;
 	}
 
 	/* Adaptive text colors with smooth transitions */

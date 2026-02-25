@@ -3,114 +3,19 @@ import { TextureLoader } from 'three';
 import { base } from '$app/paths';
 import { audioSystem } from '$lib/AudioSystem.js';
 
-import { browser } from '$app/environment';
-
 // Create a new TextureLoader
-let loader;
-let texture = [];
+const loader = new TextureLoader();
 
-if (browser) {
-    loader = new TextureLoader();
-    // Initialize with placeholders (1x1 transparent pixel)
-    // This prevents 404s or WebGL errors while waiting for real textures
-    const placeholder = new THREE.Texture();
-    texture = [
-        placeholder, placeholder, placeholder, placeholder,
-        placeholder, placeholder, placeholder
-    ];
-
-    // Immediate load of the first texture
-    loader.load(`${base}/my-photo.webp`, (loadedTexture) => {
-        texture[0] = loadedTexture;
-        // If sphere is already created, update it immediately
-        if (typeof SPHERE !== 'undefined' && SPHERE && SPHERE.material) {
-            SPHERE.material.uniforms.tDiffuse1.value = loadedTexture;
-            SPHERE.material.uniforms.tDiffuse1.needsUpdate = true;
-        }
-    });
-}
-
-// Exported function to set the initial texture from a pre-loaded image
-export const setInitialTexture = (img) => {
-    if (!img) return;
-
-    const loadedTexture = new THREE.Texture(img);
-    loadedTexture.needsUpdate = true;
-    texture[0] = loadedTexture;
-
-    // If sphere is already created, update it immediately
-    if (typeof SPHERE !== 'undefined' && SPHERE && SPHERE.material) {
-        SPHERE.material.uniforms.tDiffuse1.value = loadedTexture;
-        SPHERE.material.uniforms.tDiffuse1.needsUpdate = true;
-    }
-};
-
-// Exported function to manually load a texture at a specific index
-export const loadTextureAtIndex = (index) => {
-    if (!browser || !loader) return;
-
-    const textureUrls = [
-        `${base}/my-photo.webp`,
-        `${base}/my-photo2.webp`,
-        `${base}/photo3.webp`,
-        `${base}/photo4.webp`,
-        `${base}/photo5.webp`,
-        `${base}/photo6.webp`,
-        `${base}/photo8.webp`
-    ];
-
-    if (index >= 0 && index < textureUrls.length) {
-        const url = textureUrls[index];
-        loader.load(url, (loadedTexture) => {
-            texture[index] = loadedTexture;
-
-            // Update shader uniforms if this texture is currently in use
-            if (SPHERE && SPHERE.material) {
-                if (index === 0 && SPHERE.material.uniforms.tDiffuse1.value === placeholder) {
-                    SPHERE.material.uniforms.tDiffuse1.value = loadedTexture;
-                    SPHERE.material.uniforms.tDiffuse1.needsUpdate = true;
-                }
-            }
-        });
-    }
-};
-
-// Exported function to load textures lazily
-export const loadTextures = () => {
-    if (!browser || !loader) return;
-
-    console.log('Lazy loading textures...');
-
-    const textureUrls = [
-        `${base}/my-photo.webp`,
-        `${base}/my-photo2.webp`,
-        `${base}/photo3.webp`,
-        `${base}/photo4.webp`,
-        `${base}/photo5.webp`,
-        `${base}/photo6.webp`,
-        `${base}/photo8.webp`
-    ];
-
-    textureUrls.forEach((url, index) => {
-        // Skip the first texture as it is loaded immediately on init or via setInitialTexture
-        if (index === 0) return;
-
-        loader.load(url, (loadedTexture) => {
-            texture[index] = loadedTexture;
-
-            // Update shader uniforms if this texture is currently in use
-            if (SPHERE && SPHERE.material) {
-                // We need to trigger a re-render or update uniforms if they are currently using this index
-                // Since we cycle through textures, we can just let the next cycle pick it up, 
-                // or we can force update if it's the very first one.
-                if (index === 0 && SPHERE.material.uniforms.tDiffuse1.value === placeholder) {
-                    SPHERE.material.uniforms.tDiffuse1.value = loadedTexture;
-                    SPHERE.material.uniforms.tDiffuse1.needsUpdate = true;
-                }
-            }
-        });
-    });
-};
+// Load your image from the static folder
+const texture = [
+    loader.load(`${base}/my-photo.webp`),
+    loader.load(`${base}/my-photo2.webp`),
+    loader.load(`${base}/photo3.webp`),
+    loader.load(`${base}/photo4.webp`),
+    loader.load(`${base}/photo5.webp`),
+    loader.load(`${base}/photo6.webp`),
+    loader.load(`${base}/photo8.webp`),
+];
 
 const ABOUT_TEXT_LINES = [
     'Pawel Knorps - artysta poruszajacy sie miedzy tradycja a eksploracja, oddany dzwiekowi jako sile przekraczajacej granice. Absolwent gitary jazzowej poznanskiej Akademii Muzycznej oraz kompozycji jazzowej na dunskiej Danish National Academy of Music w Odense.',
@@ -189,12 +94,12 @@ let isDragging = false;
 let previousMousePosition = { x: 0, y: 0 };
 let sphereRotation = { x: 0, y: 0 };
 let targetRotation = { x: 0, y: 0 };
-const rotationSpeed = 0.002; // Reduced from 0.008
-const dampingFactor = 0.03; // Reduced from 0.05
+const rotationSpeed = 0.008;
+const dampingFactor = 0.05;
 let dragStartTime = 0;
 let hasMovedWhileDragging = false;
 
-// Custom ShaderMaterial for morphing with wave-based texture distortion
+// Custom ShaderMaterial for morphing with Perlin noise in vertex shader
 const morphShader = {
     uniforms: {
         tDiffuse1: { value: texture[0] },
@@ -204,36 +109,111 @@ const morphShader = {
         videoMix: { value: 0 },
         aboutTextIntensity: { value: 0 },
         morphFactor: { value: n },
-        time: { value: 0 },
+        time: { value: 0},
         uAudioLow: { value: 0 },
         uAudioMid: { value: 0 },
-        uAudioHigh: { value: 0 }
+        uAudioHigh: { value: 0 },
+        uNotePulse: { value: 0 },
+        uEnergy: { value: 0 }
     },
     vertexShader: `
+        // Classic Perlin 3D Noise by Stefan Gustavson
+        vec4 permute(vec4 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
+        vec4 taylorInvSqrt(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
+        vec3 fade(vec3 t) { return t*t*t*(t*(t*6.0-15.0)+10.0); }
+
+        float cnoise(vec3 P) {
+            vec3 Pi0 = floor(P);
+            vec3 Pi1 = Pi0 + vec3(1.0);
+            Pi0 = mod(Pi0, 289.0);
+            Pi1 = mod(Pi1, 289.0);
+            vec3 Pf0 = fract(P);
+            vec3 Pf1 = Pf0 - vec3(1.0);
+            vec4 ix = vec4(Pi0.x, Pi1.x, Pi0.x, Pi1.x);
+            vec4 iy = vec4(Pi0.yy, Pi1.yy);
+            vec4 iz0 = Pi0.zzzz;
+            vec4 iz1 = Pi1.zzzz;
+
+            vec4 ixy = permute(permute(ix) + iy);
+            vec4 ixy0 = permute(ixy + iz0);
+            vec4 ixy1 = permute(ixy + iz1);
+
+            vec4 gx0 = ixy0 / 7.0;
+            vec4 gy0 = fract(floor(gx0) / 7.0) - 0.5;
+            gx0 = fract(gx0);
+            vec4 gz0 = vec4(0.5) - abs(gx0) - abs(gy0);
+            vec4 sz0 = step(gz0, vec4(0.0));
+            gx0 -= sz0 * (step(0.0, gx0) - 0.5);
+            gy0 -= sz0 * (step(0.0, gy0) - 0.5);
+
+            vec4 gx1 = ixy1 / 7.0;
+            vec4 gy1 = fract(floor(gx1) / 7.0) - 0.5;
+            gx1 = fract(gx1);
+            vec4 gz1 = vec4(0.5) - abs(gx1) - abs(gy1);
+            vec4 sz1 = step(gz1, vec4(0.0));
+            gx1 -= sz1 * (step(0.0, gx1) - 0.5);
+            gy1 -= sz1 * (step(0.0, gy1) - 0.5);
+
+            vec3 g000 = vec3(gx0.x, gy0.x, gz0.x);
+            vec3 g100 = vec3(gx0.y, gy0.y, gz0.y);
+            vec3 g010 = vec3(gx0.z, gy0.z, gz0.z);
+            vec3 g110 = vec3(gx0.w, gy0.w, gz0.w);
+            vec3 g001 = vec3(gx1.x, gy1.x, gz1.x);
+            vec3 g101 = vec3(gx1.y, gy1.y, gz1.y);
+            vec3 g011 = vec3(gx1.z, gy1.z, gz1.z);
+            vec3 g111 = vec3(gx1.w, gy1.w, gz1.w);
+
+            vec4 norm0 = taylorInvSqrt(vec4(dot(g000, g000), dot(g010, g010), dot(g100, g100), dot(g110, g110)));
+            g000 *= norm0.x;
+            g010 *= norm0.y;
+            g100 *= norm0.z;
+            g110 *= norm0.w;
+            vec4 norm1 = taylorInvSqrt(vec4(dot(g001, g001), dot(g011, g011), dot(g101, g101), dot(g111, g111)));
+            g001 *= norm1.x;
+            g011 *= norm1.y;
+            g101 *= norm1.z;
+            g111 *= norm1.w;
+
+            float n000 = dot(g000, Pf0);
+            float n100 = dot(g100, vec3(Pf1.x, Pf0.yz));
+            float n010 = dot(g010, vec3(Pf0.x, Pf1.y, Pf0.z));
+            float n110 = dot(g110, vec3(Pf1.xy, Pf0.z));
+            float n001 = dot(g001, vec3(Pf0.xy, Pf1.z));
+            float n101 = dot(g101, vec3(Pf1.x, Pf0.y, Pf1.z));
+            float n011 = dot(g011, vec3(Pf0.x, Pf1.yz));
+            float n111 = dot(g111, Pf1);
+
+            vec3 fade_xyz = fade(Pf0);
+            vec4 n_z = mix(vec4(n000, n100, n010, n110), vec4(n001, n101, n011, n111), fade_xyz.z);
+            vec2 n_yz = mix(n_z.xy, n_z.zw, fade_xyz.y);
+            float n_xyz = mix(n_yz.x, n_yz.y, fade_xyz.x);
+            return 2.2 * n_xyz;
+        }
+
         uniform float time;
         uniform float uAudioLow;
         uniform float uAudioMid;
         uniform float uAudioHigh;
+        uniform float uNotePulse;
+        uniform float uEnergy;
         varying vec2 vUv;
-        varying float vDisplacement;
 
         void main() {
             vUv = uv;
             vec3 pos = position;
-            
-            // Rhythmic wave displacement
-            // Create a standing wave pattern that reacts to bass
-            float wave = sin(pos.y * 5.0 + time * 2.0) * cos(pos.x * 5.0 + time) * 0.1;
-            float bassWave = sin(pos.z * 10.0 + time * 5.0) * uAudioLow * 0.8; // Boosted from 0.2
-            
-            // High frequency jitter
-            float jitter = sin(time * 20.0 + pos.x * 20.0) * uAudioHigh * 0.2; // Boosted from 0.05
-            
-            float totalDisplacement = wave + bassWave + jitter;
-            vDisplacement = totalDisplacement;
-            
-            pos = pos + normal * totalDisplacement;
-            
+            float noiseValue = cnoise(vec3(pos.x + time, pos.y, pos.z));
+            float bassBreath = sin(time * 180.0 + pos.y * 6.0) * uAudioLow * 0.08;
+            float midTurbulence = noiseValue * (0.22 + uAudioMid * 0.55 + uEnergy * 0.1);
+            float highCrackle = sin((pos.x * 20.0 + pos.z * 18.0) + time * 420.0) * uAudioHigh * 0.02;
+            float pulsePush = uNotePulse * 0.08;
+            float radialWarp = sin((pos.x - pos.y + pos.z) * 8.0 + time * 150.0) * uEnergy * 0.03;
+            float swirl = sin(time * 160.0 + pos.y * 8.0) * (uAudioMid * 0.3 + uNotePulse * 0.2);
+            float c = cos(swirl);
+            float s = sin(swirl);
+            pos.xz = mat2(c, -s, s, c) * pos.xz;
+            float axisWarp = sin((pos.y + time * 150.0) * 4.0) * uAudioLow * 0.04
+                + cos((pos.x - time * 90.0) * 5.0) * uAudioHigh * 0.02;
+            pos = pos + normal * (bassBreath + midTurbulence + highCrackle + pulsePush + radialWarp + axisWarp);
             gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
         }
     `,
@@ -246,12 +226,16 @@ const morphShader = {
         uniform float aboutTextIntensity;
         uniform float morphFactor;
         uniform float time;
+        uniform float uAudioLow;
+        uniform float uAudioMid;
+        uniform float uAudioHigh;
+        uniform float uNotePulse;
+        uniform float uEnergy;
         varying vec2 vUv;
-        varying float vDisplacement;
 
         void main() {
             vec2 offset = vec2(0.3, 0.2);
-            vec2 shiftedUv = fract(vUv + offset); 
+            vec2 shiftedUv = fract(vUv + offset);
             vec4 color1 = texture2D(tDiffuse1, shiftedUv);
             vec4 color2 = texture2D(tDiffuse2, shiftedUv);
             vec4 baseColor = mix(color1, color2, morphFactor);
@@ -266,7 +250,7 @@ const morphShader = {
             float pulse = 0.6 + 0.4 * sin(time * 2.2 + vUv.y * 8.0);
             vec3 hologram = mix(vec3(0.78, 0.92, 1.0), vec3(1.0, 1.0, 1.0), pulse);
 
-            float scanline = 0.96 + 0.04 * sin((vUv.y + time * 0.08) * 320.0);
+            float scanline = 1.0;
             vec3 projected = baseColor.rgb + hologram * textMask * 0.95;
             vec3 finalColor = mix(baseColor.rgb, projected, textMask) * scanline;
 
@@ -275,13 +259,19 @@ const morphShader = {
             float videoMask = smoothstep(0.12, 0.92, videoMix);
             finalColor = mix(finalColor, mix(finalColor, videoColor, 0.92), videoMask);
 
+            float energy = clamp(uAudioLow * 0.5 + uAudioMid * 0.9 + uAudioHigh * 0.7 + uNotePulse, 0.0, 2.0);
+            float shock = smoothstep(0.28, 0.82, distance(vUv, vec2(0.5)));
+            finalColor *= 1.0 + shock * (uNotePulse * 0.2 + uAudioLow * 0.07);
+            finalColor = mix(finalColor, finalColor * (0.96 + 0.04 * sin(time * 180.0 + vUv.y * 26.0)), clamp(uAudioMid * 0.22, 0.0, 0.2));
+            finalColor *= 0.98 + 0.02 * smoothstep(0.0, 1.4, energy);
+
             gl_FragColor = vec4(finalColor, baseColor.a);
         }
     `
 };
 
 const SPHERE = new THREE.Mesh(
-    new THREE.SphereGeometry(1, 64, 64),
+    new THREE.SphereGeometry(1, 200, 200),
     new THREE.ShaderMaterial(morphShader)
 );
 
@@ -298,15 +288,14 @@ const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.2);
 directionalLight2.position.set(-1, 0, 1);
 SCENE.add(directionalLight2);
 SCENE.add(directionalLight);
+const baseDirectionalLightColor = directionalLight.color.clone();
+const baseDirectionalLight2Color = directionalLight2.color.clone();
+const baseDirectionalLightIntensity = directionalLight.intensity;
+const baseDirectionalLight2Intensity = directionalLight2.intensity;
 
 let z = 5;
 let m = 0.2;
-let CAMERA;
-if (browser) {
-    CAMERA = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, m, z);
-} else {
-    CAMERA = new THREE.PerspectiveCamera(75, 1, m, z);
-}
+let CAMERA = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, m, z);
 CAMERA.position.z = 2.2;
 const baseCameraFov = 75;
 const focusCameraFov = 56;
@@ -335,25 +324,25 @@ export const setAudioSystem = (system) => {
 // Audio initialization
 const initAudio = async () => {
     if (isAudioInitialized) return;
-
+    
     try {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
-
+        
         if (audioContext.state === 'suspended') {
             await audioContext.resume();
         }
-
+        
         // Master gain
         masterGain = audioContext.createGain();
         masterGain.gain.setValueAtTime(0.92, audioContext.currentTime);
         masterGain.connect(audioContext.destination);
-
+        
         // Create reverb
         const reverbTime = 2.8;
         const reverbLength = audioContext.sampleRate * reverbTime;
         reverb = audioContext.createConvolver();
         const impulseBuffer = audioContext.createBuffer(2, reverbLength, audioContext.sampleRate);
-
+        
         for (let channel = 0; channel < 2; channel++) {
             const channelData = impulseBuffer.getChannelData(channel);
             for (let i = 0; i < reverbLength; i++) {
@@ -363,25 +352,25 @@ const initAudio = async () => {
         }
         reverb.buffer = impulseBuffer;
         reverb.connect(masterGain);
-
+        
         // Create delay
         delay = audioContext.createDelay(1.0);
         delay.delayTime.setValueAtTime(0.25, audioContext.currentTime);
-
+        
         const delayFeedback = audioContext.createGain();
         delayFeedback.gain.setValueAtTime(0.3, audioContext.currentTime);
-
+        
         const delayWet = audioContext.createGain();
         delayWet.gain.setValueAtTime(0.2, audioContext.currentTime);
-
+        
         delay.connect(delayFeedback);
         delayFeedback.connect(delay);
         delay.connect(delayWet);
         delayWet.connect(masterGain);
-
+        
         isAudioInitialized = true;
         console.log('Audio initialized successfully');
-
+        
         // Hide audio notice
         const audioNotice = document.querySelector('.audio-notice');
         if (audioNotice) {
@@ -389,10 +378,10 @@ const initAudio = async () => {
             audioNotice.style.transform = 'translateY(-20px) translateX(-50%)';
             setTimeout(() => audioNotice?.remove(), 300);
         }
-
+        
         // Welcome sound
         playWelcomeSound();
-
+        
     } catch (error) {
         console.warn('Audio init failed:', error);
     }
@@ -401,16 +390,16 @@ const initAudio = async () => {
 // Audio functions
 const playWelcomeSound = () => {
     if (!isAudioInitialized) return;
-
+    
     const currentTime = audioContext.currentTime;
     const welcome = audioContext.createOscillator();
     welcome.type = 'sine';
     welcome.frequency.setValueAtTime(523, currentTime);
-
+    
     const welcomeGain = audioContext.createGain();
     welcomeGain.gain.setValueAtTime(0.02, currentTime);
     welcomeGain.gain.exponentialRampToValueAtTime(0.001, currentTime + 1.0);
-
+    
     welcome.connect(welcomeGain);
     welcomeGain.connect(reverb);
     welcome.start();
@@ -419,17 +408,17 @@ const playWelcomeSound = () => {
 
 const playDragSound = () => {
     if (!isAudioInitialized) return;
-
+    
     const currentTime = audioContext.currentTime;
-
+    
     const dragOsc = audioContext.createOscillator();
     dragOsc.type = 'triangle';
     dragOsc.frequency.setValueAtTime(120 + Math.random() * 80, currentTime);
-
+    
     const dragGain = audioContext.createGain();
     dragGain.gain.setValueAtTime(0.015, currentTime);
     dragGain.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.4);
-
+    
     dragOsc.connect(dragGain);
     dragGain.connect(delay);
     dragOsc.start();
@@ -438,34 +427,34 @@ const playDragSound = () => {
 
 const playClickSound = () => {
     if (!isAudioInitialized) return
-
+    
     const currentTime = audioContext.currentTime;
-
+    
     // FM synthesis click
     const carrier = audioContext.createOscillator();
     const modulator = audioContext.createOscillator();
-
+    
     carrier.type = 'sine';
     modulator.type = 'sine';
-
+    
     const carrierFreq = 400 + Math.random() * 200;
     carrier.frequency.setValueAtTime(carrierFreq, currentTime);
     modulator.frequency.setValueAtTime(carrierFreq * 3, currentTime);
-
+    
     const modGain = audioContext.createGain();
     modGain.gain.setValueAtTime(50, currentTime);
     modGain.gain.exponentialRampToValueAtTime(5, currentTime + 0.2);
-
+    
     const clickGain = audioContext.createGain();
     clickGain.gain.setValueAtTime(0.03, currentTime);
     clickGain.gain.exponentialRampToValueAtTime(0.001, currentTime + 1.5);
-
+    
     modulator.connect(modGain);
     modGain.connect(carrier.frequency);
     carrier.connect(clickGain);
     clickGain.connect(reverb);
     clickGain.connect(delay);
-
+    
     carrier.start();
     modulator.start();
     carrier.stop(currentTime + 1.5);
@@ -474,17 +463,17 @@ const playClickSound = () => {
 
 const playHoverSound = () => {
     if (!isAudioInitialized) return;
-
+    
     const currentTime = audioContext.currentTime;
-
+    
     const hover = audioContext.createOscillator();
     hover.type = 'sine';
     hover.frequency.setValueAtTime(800 + Math.random() * 400, currentTime);
-
+    
     const hoverGain = audioContext.createGain();
     hoverGain.gain.setValueAtTime(0.01, currentTime);
     hoverGain.gain.exponentialRampToValueAtTime(0.001, currentTime + 1.2);
-
+    
     hover.connect(hoverGain);
     hoverGain.connect(reverb);
     hover.start();
@@ -493,18 +482,18 @@ const playHoverSound = () => {
 
 const playMorphSound = () => {
     if (!isAudioInitialized) return;
-
+    
     const currentTime = audioContext.currentTime;
-
+    
     const morph = audioContext.createOscillator();
     morph.type = 'triangle';
     morph.frequency.setValueAtTime(150, currentTime);
     morph.frequency.exponentialRampToValueAtTime(300, currentTime + 1.0);
-
+    
     const morphGain = audioContext.createGain();
     morphGain.gain.setValueAtTime(0.02, currentTime);
     morphGain.gain.exponentialRampToValueAtTime(0.001, currentTime + 1.2);
-
+    
     morph.connect(morphGain);
     morphGain.connect(delay);
     morph.start();
@@ -514,101 +503,12 @@ const playMorphSound = () => {
 /**
  * Updates the Three.js scene with project data and regenerates points.
  */
-/**
- * Updates the Three.js scene with project data and regenerates points.
- * Uses batch processing to avoid freezing the main thread.
- */
-// --- Instanced Shader Material ---
-const instancedParticleMaterial = new THREE.ShaderMaterial({
-    uniforms: {
-        time: { value: 0 }
-    },
-    vertexShader: `
-        attribute float aSize;
-        attribute vec3 aColor;
-        attribute vec3 aInstancePosition;
-        attribute float aHoverFactor;
-        attribute float aDestructionFactor;
-        attribute float aMovementOffset;
-        
-        varying vec3 vColor;
-        varying float vDestructionFactor;
-        
-        uniform float time;
-        
-        void main() {
-            vColor = aColor;
-            vDestructionFactor = aDestructionFactor;
-            
-            // Local vertex position (one of the points)
-            vec3 pos = position;
-            
-            // Project position on sphere
-            vec3 instancePos = aInstancePosition;
-            
-            // Local expansion during hover
-            pos += normalize(position) * aHoverFactor * 0.1;
-            
-            // Final world position
-            vec3 worldPos = instancePos + pos;
-            
-            // Destruction effect
-            if (aDestructionFactor > 0.0) {
-                float explosionForce = aDestructionFactor * 2.0;
-                worldPos += normalize(pos) * explosionForce;
-                worldPos += vec3(
-                    sin(time * 10.0 + pos.x * 20.0) * aDestructionFactor * 0.05,
-                    cos(time * 8.0 + pos.y * 15.0) * aDestructionFactor * 0.05,
-                    sin(time * 12.0 + pos.z * 18.0) * aDestructionFactor * 0.05
-                );
-            }
-            
-            vec4 mvPosition = modelViewMatrix * vec4(worldPos, 1.0);
-            gl_PointSize = aSize * (200.0 / -mvPosition.z) * (1.0 - aDestructionFactor * 0.5);
-            gl_Position = projectionMatrix * mvPosition;
-        }
-    `,
-    fragmentShader: `
-        varying vec3 vColor;
-        varying float vDestructionFactor;
-        
-        void main() {
-            float distance = length(gl_PointCoord - vec2(0.5));
-            if (distance > 0.5) discard;
-            
-            float alpha = 1.0 - distance * 2.0;
-            alpha *= (1.0 - vDestructionFactor * 0.7);
-            
-            gl_FragColor = vec4(vColor, alpha);
-        }
-    `,
-    transparent: true,
-    depthTest: false,
-    blending: THREE.AdditiveBlending
-});
-
-/**
- * Updates the Three.js scene with project data and regenerates points.
- * Uses instanced rendering for efficiency.
- */
 export const updateProjects = (musicProjects, programmingProjects) => {
-    // Clear existing points and dispose of resources
-    projectPoints.children.forEach(child => {
-        if (child.geometry) child.geometry.dispose();
-        if (child.material) {
-            if (Array.isArray(child.material)) {
-                child.material.forEach(m => m.dispose());
-            } else {
-                child.material.dispose();
-            }
-        }
-    });
+    // Clear existing points
     while (projectPoints.children.length > 0) {
         projectPoints.remove(projectPoints.children[0]);
     }
-    interactionObjects.length = 0;
-    instancedInteractionGroups = [];
-
+    
     // Combine all projects and add IDs
     allProjects = [
         ...musicProjects.map((project, index) => ({
@@ -624,184 +524,150 @@ export const updateProjects = (musicProjects, programmingProjects) => {
             id: `programming-${index}`
         }))
     ];
+    
+    // Create points for each project
+    allProjects.forEach((project, globalIndex) => {
+        const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+        const y = 1 - (globalIndex / (allProjects.length - 1)) * 2;
+        const radius = Math.sqrt(1 - y * y);
+        const theta = goldenAngle * globalIndex;
+        
+        const pointMesh = createDestructiblePoint(project, {
+            phi: Math.acos(y),
+            theta: theta
+        });
+        projectPoints.add(pointMesh);
+    });
+    
+    // Collect interaction spheres for raycasting
+    interactionObjects = projectPoints.children.map(group => group.children.find(child => child instanceof THREE.Mesh));
+};
 
-    if (allProjects.length === 0) return;
-
-    // Create Instanced Geometry
-    const particleCountPerProject = 5;
-    const baseGeometry = new THREE.BufferGeometry();
-    const vertices = new Float32Array(particleCountPerProject * 3);
-    for (let i = 0; i < particleCountPerProject; i++) {
+/**
+ * Creates a destructible point group with particles and interaction sphere.
+ */
+const createDestructiblePoint = (project, position) => {
+    const pointGroup = new THREE.Group();
+    
+    // Particle system
+    const particleCount = 5;
+    const particles = new THREE.BufferGeometry();
+    const positions = new Float32Array(particleCount * 3);
+    const colors = new Float32Array(particleCount * 3);
+    const sizes = new Float32Array(particleCount);
+    
+    for (let i = 0; i < particleCount; i++) {
         const phi = Math.random() * Math.PI * 2;
         const theta = Math.random() * Math.PI;
         const radius = 0.005 + Math.random() * 0.01;
-        vertices[i * 3] = radius * Math.sin(theta) * Math.cos(phi);
-        vertices[i * 3 + 1] = radius * Math.sin(theta) * Math.sin(phi);
-        vertices[i * 3 + 2] = radius * Math.cos(theta);
+        
+        positions[i * 3] = radius * Math.sin(theta) * Math.cos(phi);
+        positions[i * 3 + 1] = radius * Math.sin(theta) * Math.sin(phi);
+        positions[i * 3 + 2] = radius * Math.cos(theta);
+        
+        colors[i * 3] = 1.0;
+        colors[i * 3 + 1] = 0.0 + Math.random() * 0.2;
+        colors[i * 3 + 2] = 0.5 + Math.random() * 0.3;
+        
+        sizes[i] = 1 + Math.random() * 1.2;
     }
-    baseGeometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
-
-    const instancedGeometry = new THREE.InstancedBufferGeometry();
-    instancedGeometry.attributes.position = baseGeometry.attributes.position;
-
-    const numInstances = allProjects.length;
-    particleHoverFactors = new Float32Array(numInstances);
-    particleDestructionFactors = new Float32Array(numInstances);
-    const instancePositions = new Float32Array(numInstances * 3);
-    const instanceColors = new Float32Array(numInstances * 3);
-    const instanceSizes = new Float32Array(numInstances);
-    const movementOffsets = new Float32Array(numInstances);
-
-    instancedGeometry.setAttribute('aInstancePosition', new THREE.InstancedBufferAttribute(instancePositions, 3));
-    instancedGeometry.setAttribute('aHoverFactor', new THREE.InstancedBufferAttribute(particleHoverFactors, 1));
-    instancedGeometry.setAttribute('aDestructionFactor', new THREE.InstancedBufferAttribute(particleDestructionFactors, 1));
-    instancedGeometry.setAttribute('aColor', new THREE.InstancedBufferAttribute(instanceColors, 3));
-    instancedGeometry.setAttribute('aSize', new THREE.InstancedBufferAttribute(instanceSizes, 1));
-    instancedGeometry.setAttribute('aMovementOffset', new THREE.InstancedBufferAttribute(movementOffsets, 1));
-
-    instancedParticleSystem = new THREE.Points(instancedGeometry, instancedParticleMaterial);
-    instancedParticleSystem.frustumCulled = false; // Ensure it doesn't pop out
-    projectPoints.add(instancedParticleSystem);
-
-    // Batch creation of interaction objects
-    let currentIndex = 0;
-    const batchSize = 2;
-
-    const processBatch = () => {
-        const endIndex = Math.min(currentIndex + batchSize, allProjects.length);
-
-        for (let i = currentIndex; i < endIndex; i++) {
-            const project = allProjects[i];
-            const globalIndex = i;
-
-            const goldenAngle = Math.PI * (3 - Math.sqrt(5));
-            const y = 1 - (globalIndex / (max(1, allProjects.length - 1))) * 2;
-            const radius = Math.sqrt(1 - y * y);
-            const theta = goldenAngle * globalIndex;
-
-            const phi = Math.acos(y);
-            const sphereRadius = 1.6;
-            const posX = sphereRadius * Math.sin(phi) * Math.cos(theta);
-            const posY = sphereRadius * Math.sin(phi) * Math.sin(theta);
-            const posZ = sphereRadius * Math.cos(phi);
-
-            // Update instanced attributes
-            instancePositions[i * 3] = posX;
-            instancePositions[i * 3 + 1] = posY;
-            instancePositions[i * 3 + 2] = posZ;
-
-            instanceColors[i * 3] = 1.0;
-            instanceColors[i * 3 + 1] = 0.0 + Math.random() * 0.2;
-            instanceColors[i * 3 + 2] = 0.5 + Math.random() * 0.3;
-
-            instanceSizes[i] = 1 + Math.random() * 1.2;
-            movementOffsets[i] = Math.random() * 2 * Math.PI;
-
-            // Create interaction group
-            const pointGroup = new THREE.Group();
-            pointGroup.position.set(posX, posY, posZ);
-
-            const interactionSphere = new THREE.Mesh(
-                new THREE.SphereGeometry(0.09, 8, 8),
-                new THREE.MeshBasicMaterial({ visible: false })
-            );
-            pointGroup.add(interactionSphere);
-            projectPoints.add(pointGroup);
-
-            interactionObjects.push(interactionSphere);
-
-            pointGroup.userData = {
-                ...project,
-                originalPosition: pointGroup.position.clone(),
-                instanceIndex: i,
-                hoverFactor: 0,
-                destructionFactor: 0,
-                isHovered: false,
-                isClicked: false,
-                movementOffset: movementOffsets[i]
-            };
-
-            instancedInteractionGroups.push(pointGroup);
-        }
-
-        instancedGeometry.attributes.aInstancePosition.needsUpdate = true;
-        instancedGeometry.attributes.aColor.needsUpdate = true;
-        instancedGeometry.attributes.aSize.needsUpdate = true;
-        instancedGeometry.attributes.aMovementOffset.needsUpdate = true;
-
-        currentIndex = endIndex;
-
-        if (currentIndex < allProjects.length) {
-            requestAnimationFrame(processBatch);
-        }
-    };
-
-    function max(a, b) { return a > b ? a : b; }
-
-    processBatch();
-};
-
-let currentFocusedId = null;
-
-/**
- * Focuses on a specific project by ID.
- * Rotates the sphere and triggers visual effects.
- */
-export const focusProject = (id) => {
-    // console.log("focusProject called with:", id);
-
-    // Find the group among children that has the matching ID
-    const pointGroup = instancedInteractionGroups.find(p => p.userData && p.userData.id === id);
-
-    if (pointGroup) {
-        // Reset hover state for all points
-        instancedInteractionGroups.forEach(p => {
-            if (p !== pointGroup) {
-                p.userData.isHovered = false;
+    
+    particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    particles.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    particles.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+    
+    const particleMaterial = new THREE.ShaderMaterial({
+        uniforms: {
+            time: { value: 0 },
+            destructionFactor: { value: 0 },
+            hoverFactor: { value: 0 }
+        },
+        vertexShader: `
+            attribute float size;
+            attribute vec3 color;
+            varying vec3 vColor;
+            uniform float time;
+            uniform float destructionFactor;
+            uniform float hoverFactor;
+            
+            void main() {
+                vColor = color;
+                
+                vec3 pos = position;
+                
+                pos += normalize(position) * hoverFactor * 0.1;
+                
+                if (destructionFactor > 0.0) {
+                    float explosionForce = destructionFactor * 2.0;
+                    pos += normalize(position) * explosionForce;
+                    pos += vec3(
+                        sin(time * 10.0 + position.x * 20.0) * destructionFactor * 0.05,
+                        cos(time * 8.0 + position.y * 15.0) * destructionFactor * 0.05,
+                        sin(time * 12.0 + position.z * 18.0) * destructionFactor * 0.05
+                    );
+                }
+                
+                vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+                gl_PointSize = size * (200.0 / -mvPosition.z) * (1.0 - destructionFactor * 0.5);
+                gl_Position = projectionMatrix * mvPosition;
             }
-        });
-
-        // Highlight the focused point
-        pointGroup.userData.isHovered = true;
-
-        // Trigger morph effect
-        const now = performance.now();
-        if (!morphing || (now - lastMorphTime > 1000)) {
-            morphing = true;
-            morphProgress = 0;
-            lastMorphTime = now;
-
-            const uniforms = SPHERE.material.uniforms;
-            uniforms.tDiffuse1.value = texture[currentTextureIndex];
-            currentTextureIndex = (currentTextureIndex + 1) % texture.length;
-            uniforms.tDiffuse2.value = texture[currentTextureIndex];
-        }
-
-        // Calculate target rotation to bring point to front
-        const p = pointGroup.userData.originalPosition;
-        const targetY = -Math.atan2(p.x, p.z);
-        const zProjected = Math.sqrt(p.x * p.x + p.z * p.z);
-        const targetX = Math.atan2(p.y, zProjected);
-
-        const autoRotationX = now * 0.00019;
-        const autoRotationY = now * 0.00019;
-
-        targetRotation.y = targetY - autoRotationY;
-        targetRotation.x = targetX - autoRotationX;
-
-        // Smooth transition
-        sphereRotation.x += (targetRotation.x - sphereRotation.x) * 0.02;
-        sphereRotation.y += (targetRotation.y - sphereRotation.y) * 0.02;
-    }
+        `,
+        fragmentShader: `
+            varying vec3 vColor;
+            uniform float destructionFactor;
+            
+            void main() {
+                float distance = length(gl_PointCoord - vec2(0.5));
+                if (distance > 0.5) discard;
+                
+                float alpha = 1.0 - distance * 2.0;
+                alpha *= (1.0 - destructionFactor * 0.7);
+                
+                gl_FragColor = vec4(vColor, alpha);
+            }
+        `,
+        transparent: true,
+        depthTest: false,
+        blending: THREE.AdditiveBlending
+    });
+    
+    const particleSystem = new THREE.Points(particles, particleMaterial);
+    pointGroup.add(particleSystem);
+    
+    // Add interaction sphere for raycasting
+    const interactionSphere = new THREE.Mesh(
+        new THREE.SphereGeometry(0.09, 8, 8), // był 0.05
+        new THREE.MeshBasicMaterial({ visible: false })
+    );
+    pointGroup.add(interactionSphere);
+    
+    // Position the group on the sphere
+    const sphereRadius = 1.6;
+    pointGroup.position.x = sphereRadius * Math.sin(position.phi) * Math.cos(position.theta);
+    pointGroup.position.y = sphereRadius * Math.sin(position.phi) * Math.sin(position.theta);
+    pointGroup.position.z = sphereRadius * Math.cos(position.phi);
+    
+    // Store project data
+    pointGroup.userData = {
+        ...project,
+        originalPosition: pointGroup.position.clone(),
+        particleMaterial: particleMaterial,
+        destructionFactor: 0,
+        hoverFactor: 0,
+        isHovered: false,
+        isClicked: false,
+        movementOffset: Math.random() * 2 * Math.PI
+    };
+    
+    return pointGroup;
 };
 
 // Variables for morphing logic
 let currentTextureIndex = 0;
 let morphing = false;
-let morphProgress = 0; // New variable for smooth easing
-let baseMorphSpeed = 0.00001; // Reduced from 0.00005
+let baseMorphSpeed = 0.000091;
 let morphSpeed = baseMorphSpeed;
-const morphDelay = 4000; // Increased delay (was 1500)
+const morphDelay = 2000;
 let lastMorphTime = 20;
 let scrollPosition = 0;
 let lastMorphSoundTime = 0;
@@ -814,6 +680,12 @@ let projectedVideoMixTarget = 0;
 let projectedVideoMixCurrent = 0;
 let projectedVideoEl = null;
 let projectedVideoTexture = null;
+let notePulse = 0;
+let audioEnergy = 0;
+let noteTriggerRegistered = false;
+let animationStarted = false;
+let animationFrameId = null;
+let sceneCanvas = null;
 
 // Scroll tracking
 const updateScrollPosition = () => {
@@ -822,30 +694,36 @@ const updateScrollPosition = () => {
     morphSpeed = baseMorphSpeed * Math.min(scrollMultiplier, 5);
 };
 
-if (browser) {
-    window.addEventListener('scroll', updateScrollPosition);
-}
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+const lerp = (start, end, factor) => start + (end - start) * factor;
+
+export const onNoteTrigger = (note, velocity = 100) => {
+    const normalizedVelocity = clamp(velocity / 127, 0, 1);
+    notePulse = Math.max(notePulse, normalizedVelocity);
+    directionalLight.intensity = baseDirectionalLightIntensity + normalizedVelocity * 0.55;
+    directionalLight2.intensity = baseDirectionalLight2Intensity + normalizedVelocity * 0.38;
+};
+
+const registerNoteTriggerHandler = () => {
+    if (noteTriggerRegistered) return;
+    audioSystem.registerNoteTriggerHandler(onNoteTrigger);
+    noteTriggerRegistered = true;
+};
+
+const unregisterNoteTriggerHandler = () => {
+    if (!noteTriggerRegistered) return;
+    audioSystem.unregisterNoteTriggerHandler();
+    noteTriggerRegistered = false;
+};
 
 const animate = async () => {
-    requestAnimationFrame(animate);
+    if (!animationStarted) return;
+    animationFrameId = requestAnimationFrame(animate);
 
     const now = performance.now();
-
+    
     // Update time uniform for sphere's noise animation
     SPHERE.material.uniforms.time.value = now * 0.00001;
-
-    // Update Audio Uniforms
-    if (audioSystem && audioSystem.isInitialized) {
-        const analysis = audioSystem.getAnalysis();
-
-        // Smooth interpolation (Lerp)
-        const lerp = (start, end, factor) => start + (end - start) * factor;
-        const smoothFactor = 0.1; // Lower = smoother
-
-        SPHERE.material.uniforms.uAudioLow.value = lerp(SPHERE.material.uniforms.uAudioLow.value, analysis.low, smoothFactor);
-        SPHERE.material.uniforms.uAudioMid.value = lerp(SPHERE.material.uniforms.uAudioMid.value, analysis.mid, smoothFactor);
-        SPHERE.material.uniforms.uAudioHigh.value = lerp(SPHERE.material.uniforms.uAudioHigh.value, analysis.high, smoothFactor);
-    }
 
     const uniforms = SPHERE.material.uniforms;
     aboutProjectionCurrent += (aboutProjectionTarget - aboutProjectionCurrent) * 0.06;
@@ -853,6 +731,38 @@ const animate = async () => {
     projectedVideoMixCurrent += (projectedVideoMixTarget - projectedVideoMixCurrent) * 0.06;
     uniforms.videoMix.value = projectedVideoMixCurrent;
     bioFocusCurrent += (bioFocusTarget - bioFocusCurrent) * 0.05;
+
+    if (audioSystem && audioSystem.isInitialized) {
+        const analysis = audioSystem.getAnalysis();
+        const low = clamp(Math.pow(analysis.low * 1.8, 0.85), 0, 1.45);
+        const mid = clamp(Math.pow(analysis.mid * 1.7, 0.9), 0, 1.35);
+        const high = clamp(Math.pow(analysis.high * 2.2, 0.95), 0, 1.6);
+        const smoothFactor = 0.08;
+
+        uniforms.uAudioLow.value = lerp(uniforms.uAudioLow.value, low, smoothFactor);
+        uniforms.uAudioMid.value = lerp(uniforms.uAudioMid.value, mid, smoothFactor);
+        uniforms.uAudioHigh.value = lerp(uniforms.uAudioHigh.value, high, smoothFactor);
+        uniforms.uNotePulse.value = lerp(uniforms.uNotePulse.value, notePulse, 0.12);
+        audioEnergy = lerp(audioEnergy, clamp(low * 0.45 + mid * 0.75 + high * 0.55 + notePulse * 0.42, 0, 1.4), 0.11);
+        uniforms.uEnergy.value = audioEnergy;
+
+        notePulse *= 0.88;
+        directionalLight.intensity = lerp(
+            directionalLight.intensity,
+            baseDirectionalLightIntensity + notePulse * 0.4 + uniforms.uAudioLow.value * 0.2,
+            0.1
+        );
+        directionalLight2.intensity = lerp(
+            directionalLight2.intensity,
+            baseDirectionalLight2Intensity + notePulse * 0.28 + uniforms.uAudioHigh.value * 0.14,
+            0.1
+        );
+        directionalLight.color.lerp(baseDirectionalLightColor, 0.03);
+        directionalLight2.color.lerp(baseDirectionalLight2Color, 0.03);
+    } else {
+        uniforms.uNotePulse.value = lerp(uniforms.uNotePulse.value, 0, 0.06);
+        uniforms.uEnergy.value = lerp(uniforms.uEnergy.value, 0, 0.06);
+    }
 
     const targetCameraZ = 2.2 - bioFocusCurrent * 0.9;
     CAMERA.position.z += (targetCameraZ - CAMERA.position.z) * 0.08;
@@ -862,72 +772,44 @@ const animate = async () => {
         CAMERA.updateProjectionMatrix();
     }
 
-    const sphereScale = baseSphereScale + (focusSphereScale - baseSphereScale) * bioFocusCurrent;
-    SPHERE.scale.set(sphereScale, sphereScale, sphereScale);
+    const scaleWave = Math.sin(now * 0.011 + uniforms.uEnergy.value * 2.2);
+    const pulseScaleBoost =
+        uniforms.uAudioLow.value * 0.16 +
+        uniforms.uAudioMid.value * 0.06 +
+        uniforms.uAudioHigh.value * 0.02 +
+        uniforms.uNotePulse.value * 0.08;
+    const pulseScaleDip =
+        uniforms.uNotePulse.value * 0.14 +
+        uniforms.uAudioHigh.value * 0.03 +
+        Math.max(0, -scaleWave) * uniforms.uEnergy.value * 0.12;
+    const signedScaleDelta = pulseScaleBoost - pulseScaleDip;
+    const sphereScale = baseSphereScale + (focusSphereScale - baseSphereScale) * bioFocusCurrent + signedScaleDelta;
+    const maxScaleForViewport = window.innerWidth < 900 ? 1.48 : 1.66;
+    const clampedSphereScale = clamp(sphereScale, 0.78, maxScaleForViewport);
+    SPHERE.scale.set(clampedSphereScale, clampedSphereScale, clampedSphereScale);
 
     // Handle morphing with scroll-based speed
-    // Calculate dynamic delay based on current texture type
-    let currentDelay = morphDelay;
-    const currentTexture = texture[currentTextureIndex];
-    if (currentTexture && currentTexture.userData && currentTexture.userData.video) {
-        const video = currentTexture.userData.video;
-        if (video.duration) {
-            // Use video duration (in ms) minus a small buffer for transition
-            currentDelay = (video.duration * 1000) - 1000;
-        }
-    }
-
-    if (!morphing && now - lastMorphTime > currentDelay) {
+    if (!morphing && now - lastMorphTime > morphDelay) {
         morphing = true;
-        morphProgress = 0; // Reset progress
         uniforms.tDiffuse1.value = texture[currentTextureIndex];
         currentTextureIndex = (currentTextureIndex + 1) % texture.length;
         uniforms.tDiffuse2.value = texture[currentTextureIndex];
-        // uniforms.morphFactor.value = 0.5; // Removed initial jump
-        lastMorphTime = now; // Reset time to now, not constant
-
+        uniforms.morphFactor.value = 0.5;
+        lastMorphTime = now;
         // Play morph sound once per morph cycle
-        if (now - lastMorphSoundTime > currentDelay) {
-            try {
-                audioSystem.playMorphSound(uniforms.morphFactor.value);
-            } catch (e) {
-                // Ignore audio errors
-            }
+        if (now - lastMorphSoundTime > morphDelay) {
+            audioSystem.playMorphSound(uniforms.morphFactor.value);
             lastMorphSoundTime = now;
         }
     }
 
     if (morphing) {
-        morphProgress += morphSpeed * 100.0; // Adjust speed scale for progress (0-1)
-
-        if (morphProgress >= 1.0) {
-            morphProgress = 1.0;
+        uniforms.morphFactor.value += morphSpeed;
+        if (uniforms.morphFactor.value >= 1.0) {
+            uniforms.morphFactor.value = 1.0;
             morphing = false;
         }
-
-        // SmoothStep easing: t * t * (3 - 2 * t)
-        const smoothed = morphProgress * morphProgress * (3.0 - 2.0 * morphProgress);
-        uniforms.morphFactor.value = smoothed;
     }
-
-    // --- Audio Logic ---
-    if (audioSystem.isInitialized) {
-        // Background Cinema Audio
-        if (cinemaVideo) {
-            cinemaVideo.muted = false;
-            // Smooth fade in if needed, or just set volume
-            if (cinemaVideo.volume < 0.8) {
-                cinemaVideo.volume += 0.01;
-            }
-            if (cinemaVideo.paused) cinemaVideo.play().catch(() => { });
-        }
-    } else {
-        // Ensure video stays muted if audio not initialized
-        if (cinemaVideo) {
-            cinemaVideo.muted = true;
-        }
-    }
-    // -------------------
 
     // Apply drag-based rotation with smooth interpolation
     if (!isDragging) {
@@ -936,9 +818,10 @@ const animate = async () => {
     }
 
     // Apply rotation to sphere and project points
-    const autoRotationX = now * 0.00019;
-    const autoRotationY = now * 0.00019;
-
+    const energySpin = 1 + uniforms.uAudioMid.value * 0.45 + uniforms.uAudioHigh.value * 0.2;
+    const autoRotationX = now * 0.00014 * energySpin;
+    const autoRotationY = now * 0.00014 * (1 + uniforms.uAudioLow.value * 0.3);
+    
     SPHERE.rotation.x = sphereRotation.x + autoRotationX;
     SPHERE.rotation.y = sphereRotation.y + autoRotationY;
     projectPoints.rotation.x = sphereRotation.x + autoRotationX;
@@ -959,6 +842,8 @@ const animate = async () => {
     const projectPointsVisible = bioFocusCurrent < 0.92;
     projectPoints.visible = projectPointsVisible;
     projectPoints.scale.setScalar(1 - bioFocusCurrent * 0.3);
+    CAMERA.position.x = lerp(CAMERA.position.x, Math.sin(now * 0.0016) * uniforms.uAudioHigh.value * 0.03, 0.04);
+    CAMERA.position.y = lerp(CAMERA.position.y, Math.cos(now * 0.0012) * uniforms.uAudioMid.value * 0.022, 0.04);
 
     // Update particle animations
     if (projectPointsVisible) {
@@ -968,31 +853,22 @@ const animate = async () => {
         
         // Slow breathing movement for each point
         const timeFactor = (now * 0.0005) + userData.movementOffset;
-        const movementScale = 0.05 * Math.sin(timeFactor);
+        const movementScale = (0.03 + uniforms.uAudioLow.value * 0.03) * Math.sin(timeFactor);
         const newPosition = userData.originalPosition.clone().multiplyScalar(1 + movementScale);
         pointGroup.position.copy(newPosition);
 
-    // Update instanced particles
-    if (instancedParticleSystem) {
-        instancedParticleSystem.material.uniforms.time.value = now * 0.00001;
-
-        instancedInteractionGroups.forEach((group, i) => {
-            const userData = group.userData;
-            const idx = userData.instanceIndex;
-
-            // Slow breathing movement for each point
-            const timeFactor = (now * 0.0005) + userData.movementOffset;
-            const movementScale = 0.05 * Math.sin(timeFactor);
-            group.position.copy(userData.originalPosition).multiplyScalar(1 + movementScale);
-
-            // Update instanced attributes
+        if (material && material.uniforms) {
+            material.uniforms.time.value = now * 0.00001;
+            
+            // Hover animation
             if (userData.isHovered && userData.hoverFactor < 1.0) {
                 userData.hoverFactor += 0.1;
             } else if (!userData.isHovered && userData.hoverFactor > 0.0) {
                 userData.hoverFactor -= 0.1;
             }
-            particleHoverFactors[idx] = userData.hoverFactor;
-
+            material.uniforms.hoverFactor.value = userData.hoverFactor;
+            
+            // Click destruction
             if (userData.isClicked && userData.destructionFactor < 3.0) {
                 userData.destructionFactor += 0.1;
             }
@@ -1013,39 +889,38 @@ export const resize = async () => {
         Renderer.setSize(window.innerWidth, window.innerHeight);
         CAMERA.aspect = window.innerWidth / window.innerHeight;
         CAMERA.updateProjectionMatrix();
-
+        
     }
 };
 
 // Mouse event handlers with safety checks
 const onMouseDown = (event) => {
     if (!event) return;
-
+    
     console.log('Mouse down detected at:', event.clientX, event.clientY);
-
+    
     // Initialize audio on first user interaction
     if (!audioSystem.isInitialized) {
         audioSystem.init();
     }
-
+    
     isDragging = true;
     hasMovedWhileDragging = false;
     dragStartTime = performance.now();
-    currentFocusedId = null; // Allow re-focusing after manual interaction
     previousMousePosition = {
         x: event.clientX,
         y: event.clientY
     };
-
+    
     document.body.style.cursor = 'grabbing';
-
+    
     if (event.preventDefault) event.preventDefault();
     if (event.stopPropagation) event.stopPropagation();
 };
 
 const onMouseMove = (event) => {
     if (!event) return;
-
+    
     // Update mouse position for raycasting
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -1055,16 +930,16 @@ const onMouseMove = (event) => {
             x: event.clientX - previousMousePosition.x,
             y: event.clientY - previousMousePosition.y
         };
-
+        
         if (Math.abs(deltaMove.x) > 1 || Math.abs(deltaMove.y) > 1) {
             hasMovedWhileDragging = true;
             console.log('Dragging with delta:', deltaMove.x, deltaMove.y);
-
+            
             // Play drag sound occasionally
             if (Math.random() < 0.58) {
                 audioSystem.playDragSound();
             }
-
+            
             // Update rotation
             targetRotation.y += deltaMove.x * rotationSpeed;
             targetRotation.x -= deltaMove.y * rotationSpeed;
@@ -1076,7 +951,7 @@ const onMouseMove = (event) => {
                 y: event.clientY
             };
         }
-
+        
         if (event.preventDefault) event.preventDefault();
         if (event.stopPropagation) event.stopPropagation();
     } else {
@@ -1095,7 +970,7 @@ const onMouseMove = (event) => {
 
                 INTERSECTED = pointGroup;
                 INTERSECTED.userData.isHovered = true;
-
+                
                 // Play hover sound occasionally
                 if (Math.random() < 0.3) {
                     audioSystem.playHoverSound();
@@ -1107,22 +982,22 @@ const onMouseMove = (event) => {
                 INTERSECTED = null;
             }
         }
-
+        
         document.body.style.cursor = intersects.length > 0 ? 'pointer' : 'grab';
     }
 };
 
 const onMouseUp = (event) => {
     console.log('Mouse up detected, was dragging:', isDragging, 'moved while dragging:', hasMovedWhileDragging);
-
+    
     const dragDuration = performance.now() - dragStartTime;
     const wasDragging = isDragging && (dragDuration > 100 || hasMovedWhileDragging);
-
+    
     isDragging = false;
     hasMovedWhileDragging = false;
-
+    
     document.body.style.cursor = 'grab';
-
+    
     if (!wasDragging) {
         handleProjectClick(event);
     }
@@ -1130,7 +1005,7 @@ const onMouseUp = (event) => {
 
 const handleProjectClick = (event) => {
     if (!event) return;
-
+    
     // Re-calculate mouse position for accurate raycasting
     const rect = Renderer.domElement.getBoundingClientRect();
     mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -1161,16 +1036,16 @@ const handleProjectClick = (event) => {
             clickedGroup.userData.isClicked = true;
             clickedGroup.userData.isHovered = false;
         }
-
+        
         // Scroll to the project section
         const projectElement = document.getElementById(project.id);
         if (projectElement) {
             console.log('Scrolling to project:', project.id);
-            projectElement.scrollIntoView({
-                behavior: 'smooth',
-                block: 'center'
+            projectElement.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'center' 
             });
-
+            
             // Add highlight effect
             projectElement.style.transform = 'scale(1.02)';
             projectElement.style.transition = 'transform 0.5s ease';
@@ -1184,22 +1059,13 @@ const handleProjectClick = (event) => {
 };
 
 // Touch event handlers
-let touchStartX = 0;
-let touchStartY = 0;
-
 const onTouchStart = (event) => {
     if (!event || !event.touches) return;
     const touch = event.touches[0];
-    touchStartX = touch.clientX;
-    touchStartY = touch.clientY;
-
-    // Do NOT prevent default here to allow potential scrolling
-    // We only prevent default if we determine it's a horizontal drag in onTouchMove
-
     onMouseDown({
         clientX: touch.clientX,
         clientY: touch.clientY,
-        preventDefault: () => { }, // No-op for start
+        preventDefault: () => event.preventDefault(),
         stopPropagation: () => event.stopPropagation()
     });
 };
@@ -1207,92 +1073,31 @@ const onTouchStart = (event) => {
 const onTouchMove = (event) => {
     if (!event || !event.touches) return;
     const touch = event.touches[0];
-
-    const deltaX = touch.clientX - touchStartX;
-    const deltaY = touch.clientY - touchStartY;
-
-    // If movement is primarily horizontal, treat as rotation and block scroll
-    if (Math.abs(deltaX) > Math.abs(deltaY)) {
-        if (event.cancelable) event.preventDefault();
-    }
-    // If movement is primarily vertical, let the browser scroll (do nothing)
-
     onMouseMove({
         clientX: touch.clientX,
         clientY: touch.clientY,
-        preventDefault: () => { }, // Handled above
+        preventDefault: () => event.preventDefault(),
         stopPropagation: () => event.stopPropagation()
     });
 };
 
 const onTouchEnd = (event) => {
     onMouseUp({
-        preventDefault: () => { },
+        preventDefault: () => event && event.preventDefault ? event.preventDefault() : null,
         stopPropagation: () => event && event.stopPropagation ? event.stopPropagation() : null
     });
 };
 
-/**
- * Creates a video texture from a file
- */
-const createVideoTexture = (videoFilename) => {
-    // 1. Create HTML Video Element (In-Memory)
-    const video = document.createElement('video');
-    video.src = `${base}/${videoFilename}`; // Uses SvelteKit base path
-    video.crossOrigin = 'anonymous';
-    video.loop = true;
-    video.muted = true; // Required for autoplay
-    video.playsInline = true;
-
-    video.play().catch(e => console.error('Video play failed:', e));
-
-
-    // 2. Create Video Texture
-    const videoTexture = new THREE.VideoTexture(video);
-    videoTexture.encoding = THREE.sRGBEncoding; // Compatibility for v0.124.0
-    videoTexture.minFilter = THREE.LinearFilter;
-    videoTexture.magFilter = THREE.LinearFilter;
-
-    // Store video element in userData for audio control
-    videoTexture.userData = { video: video };
-
-    return videoTexture;
-};
-
-/**
- * Creates a fullscreen CSS background video
- */
-const createCinemaBackground = (videoFilename) => {
-    // 1. Create Video Element (reusing helper, but we don't need the texture)
-    const video = document.createElement('video');
-    video.src = `${base}/${videoFilename}`;
-    video.loop = true;
-    video.muted = true;
-    video.playsInline = true;
-    video.crossOrigin = 'anonymous';
-
-    // 2. Style as Fullscreen Background
-    video.style.position = 'fixed';
-    video.style.top = '0';
-    video.style.left = '0';
-    video.style.width = '100%';
-    video.style.height = '100%';
-    video.style.objectFit = 'cover';
-    video.style.zIndex = '-1'; // Behind canvas
-    document.body.appendChild(video);
-
-    video.play().catch(e => console.error('Video play failed:', e));
-
-    return video;
-};
-
 export const setScene = async (canvas) => {
+    if (animationStarted) {
+        destroyScene();
+    }
+
+    sceneCanvas = canvas;
     Renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
     Renderer.setClearColor("#000000");
     if ('outputColorSpace' in Renderer && srgbColorSpace) {
         Renderer.outputColorSpace = srgbColorSpace;
-    } else if ('outputEncoding' in Renderer && THREE.sRGBEncoding) {
-        Renderer.outputEncoding = THREE.sRGBEncoding;
     }
 
     if (!aboutTextTexture) {
@@ -1313,34 +1118,26 @@ export const setScene = async (canvas) => {
     SPHERE.material.uniforms.aboutTextIntensity.value = aboutProjectionCurrent;
     
     canvas.style.cursor = 'grab';
-
+    
     // Add event listeners
     window.addEventListener('resize', resize);
-
+    window.addEventListener('scroll', updateScrollPosition);
+    
     canvas.addEventListener('mousedown', onMouseDown, { passive: false });
     document.addEventListener('mousemove', onMouseMove, { passive: false });
     document.addEventListener('mouseup', onMouseUp, { passive: false });
-
+    
     // Touch events
     canvas.addEventListener('touchstart', onTouchStart, { passive: false });
     canvas.addEventListener('touchmove', onTouchMove, { passive: false });
     canvas.addEventListener('touchend', onTouchEnd, { passive: false });
-
-    // Test event binding
-    canvas.addEventListener('mouseenter', () => {
-        console.log('Mouse entered canvas - events are working!');
-    });
-
+    
+    canvas.addEventListener('mouseenter', onCanvasMouseEnter);
+    
     console.log('Scene initialized with drag controls');
-
-    // Async Shader Compilation to avoid freezing the main thread
-    if (Renderer.compileAsync) {
-        await Renderer.compileAsync(SCENE, CAMERA);
-    } else {
-        // Fallback for older Three.js versions
-        Renderer.compile(SCENE, CAMERA);
-    }
-
+    registerNoteTriggerHandler();
+    animationStarted = true;
+    
     await resize();
     await animate();
 };
@@ -1376,11 +1173,8 @@ export const setProjectedVideo = async (url) => {
             projectedVideoTexture = new THREE.VideoTexture(projectedVideoEl);
             projectedVideoTexture.minFilter = THREE.LinearFilter;
             projectedVideoTexture.magFilter = THREE.LinearFilter;
-            projectedVideoTexture.format = THREE.RGBFormat;
             if ('colorSpace' in projectedVideoTexture && srgbColorSpace) {
                 projectedVideoTexture.colorSpace = srgbColorSpace;
-            } else if ('encoding' in projectedVideoTexture && THREE.sRGBEncoding) {
-                projectedVideoTexture.encoding = THREE.sRGBEncoding;
             }
         }
         SPHERE.material.uniforms.tVideo.value = projectedVideoTexture;
@@ -1399,5 +1193,37 @@ export const clearProjectedVideo = () => {
         projectedVideoEl.pause();
         projectedVideoEl.removeAttribute('src');
         projectedVideoEl.load();
+    }
+};
+
+const onCanvasMouseEnter = () => {
+    console.log('Mouse entered canvas - events are working!');
+};
+
+export const destroyScene = () => {
+    animationStarted = false;
+
+    if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+    }
+
+    window.removeEventListener('resize', resize);
+    window.removeEventListener('scroll', updateScrollPosition);
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+
+    if (sceneCanvas) {
+        sceneCanvas.removeEventListener('mousedown', onMouseDown);
+        sceneCanvas.removeEventListener('touchstart', onTouchStart);
+        sceneCanvas.removeEventListener('touchmove', onTouchMove);
+        sceneCanvas.removeEventListener('touchend', onTouchEnd);
+        sceneCanvas.removeEventListener('mouseenter', onCanvasMouseEnter);
+        sceneCanvas = null;
+    }
+
+    unregisterNoteTriggerHandler();
+    if (audioSystem && typeof audioSystem.detachComputerKeyboard === 'function') {
+        audioSystem.detachComputerKeyboard();
     }
 };

@@ -29,6 +29,19 @@ class AudioSystem {
             hover: 0,
             click: 0
         };
+
+        this.keyMap = {
+            a: 60, w: 61, s: 62, e: 63, d: 64, f: 65,
+            t: 66, g: 67, y: 68, h: 69, u: 70, j: 71, k: 72
+        };
+        this.activeKeyboardNotes = new Set();
+        this.keyboardAttached = false;
+        this.keyboardHandlers = null;
+        this.noteTriggerHandler = null;
+        this.userSoundProfile = null;
+        this.userSoundProfileVersion = 2;
+        this.narrationChannel = 1;
+        this.activeNarrationNotes = new Set();
     }
 
     async init() {
@@ -142,12 +155,11 @@ class AudioSystem {
             this.rnboDevice.node.connect(this.analyser);
             this.analyser.connect(this.audioContext.destination);
 
-            // Set initial parameters
-            this.setParameter('window', this.params.window);
-            this.setParameter('chorus', this.params.chorus);
-            this.setParameter('delay', this.params.delay);
-            this.setParameter('feedback', this.params.feedback);
+            // Apply persistent per-user sound profile (strong randomization)
+            this.userSoundProfile = this.getOrCreateUserSoundProfile();
+            this.applyParameterMap(this.userSoundProfile);
 
+            this.attachComputerKeyboard();
             console.log('RNBO Device Loaded', this.rnboDevice.parameters);
 
         } catch (err) {
@@ -156,6 +168,57 @@ class AudioSystem {
             this.masterGain.connect(this.analyser);
             this.analyser.connect(this.audioContext.destination);
         }
+    }
+
+    randomInRange(min, max) {
+        return min + Math.random() * (max - min);
+    }
+
+    skewedRandom(min, max, skew = 1) {
+        const t = Math.pow(Math.random(), skew);
+        return min + t * (max - min);
+    }
+
+    generateUserSoundProfile() {
+        const mode = Math.floor(Math.random() * 4);
+        const profile = {
+            // Core
+            window: Math.round(this.skewedRandom(1, 1000, mode === 0 ? 0.6 : 1.5)),
+            chorus: Math.round(this.skewedRandom(0, 100, mode === 1 ? 0.8 : 1.4)),
+            delay: Math.round(this.skewedRandom(40, 2000, mode === 2 ? 0.9 : 1.6)),
+            feedback: Math.round(this.skewedRandom(8, 95, mode === 3 ? 0.75 : 1.4)),
+
+            // Extra RNBO-facing params
+            mix: Math.round(this.randomInRange(10, 100)),
+            pitchvol: Math.round(this.randomInRange(5, 100)),
+            revvol: Math.round(this.randomInRange(0, 100)),
+            octdamp: Math.round(this.randomInRange(0, 100)),
+            octvol: Math.round(this.randomInRange(0, 100)),
+            decay: Math.round(this.randomInRange(5, 100)),
+            size: Math.round(this.randomInRange(0, 100)),
+            damp: Math.round(this.randomInRange(0, 100)),
+            jitter: Math.round(this.randomInRange(0, 80)),
+            diff: Math.round(this.randomInRange(0, 100))
+        };
+
+        return profile;
+    }
+
+    getOrCreateUserSoundProfile() {
+        if (this.userSoundProfile) return this.userSoundProfile;
+        this.userSoundProfile = this.generateUserSoundProfile();
+        return this.userSoundProfile;
+    }
+
+    getUserSoundProfile() {
+        return this.userSoundProfile || this.getOrCreateUserSoundProfile();
+    }
+
+    applyParameterMap(paramMap) {
+        if (!paramMap || typeof paramMap !== 'object') return;
+        Object.entries(paramMap).forEach(([name, value]) => {
+            this.setParameter(name, value);
+        });
     }
 
     setupMIDI() {
@@ -188,35 +251,155 @@ class AudioSystem {
         if (!this.rnboDevice) return;
 
         const [status, data1, data2] = message.data;
-        const command = status & 0xf0;
-        const channel = status & 0x0f;
-
-        // Forward MIDI to RNBO device
-        // RNBO expects a MIDI event object
-        if (this.rnboPkg) {
-            const midiEvent = new this.rnboPkg.MIDIEvent(this.audioContext.currentTime * 1000, 0, [status, data1, data2]);
-            this.rnboDevice.scheduleEvent(midiEvent);
-        }
+        this.sendMidi(status, data1, data2);
     }
 
     triggerTestNote() {
         if (!this.rnboDevice) return;
-
-        const noteOn = [144, 60, 100]; // Note On, Middle C, Velocity 100
-        const noteOff = [128, 60, 0];  // Note Off, Middle C, Velocity 0
         const duration = 500; // ms
-
-        const now = this.audioContext.currentTime * 1000;
-
-        if (this.rnboPkg) {
-            const noteOnEvent = new this.rnboPkg.MIDIEvent(now, 0, noteOn);
-            const noteOffEvent = new this.rnboPkg.MIDIEvent(now + duration, 0, noteOff);
-
-            this.rnboDevice.scheduleEvent(noteOnEvent);
-            this.rnboDevice.scheduleEvent(noteOffEvent);
-        }
+        this.noteOn(60, 100, 0);
+        window.setTimeout(() => this.noteOff(60, 0), duration);
 
         console.log('Test note triggered');
+    }
+
+    registerNoteTriggerHandler(handler) {
+        this.noteTriggerHandler = typeof handler === 'function' ? handler : null;
+    }
+
+    unregisterNoteTriggerHandler() {
+        this.noteTriggerHandler = null;
+    }
+
+    sendMidi(status, note, velocity) {
+        if (!this.rnboDevice || !this.rnboPkg || !this.audioContext) return;
+
+        const midiStatus = Number(status) & 0xff;
+        const midiNote = Math.max(0, Math.min(127, Number(note) || 0));
+        const midiVelocity = Math.max(0, Math.min(127, Number(velocity) || 0));
+
+        const midiEvent = new this.rnboPkg.MIDIEvent(
+            this.audioContext.currentTime * 1000,
+            0,
+            [midiStatus, midiNote, midiVelocity]
+        );
+        this.rnboDevice.scheduleEvent(midiEvent);
+
+        const command = midiStatus & 0xf0;
+        if (command === 0x90 && midiVelocity > 0) {
+            this.noteTriggerHandler?.(midiNote, midiVelocity);
+        }
+    }
+
+    noteOn(note, velocity = 100, channel = 0) {
+        const status = 0x90 | (channel & 0x0f);
+        this.sendMidi(status, note, velocity);
+    }
+
+    noteOff(note, channel = 0) {
+        const status = 0x80 | (channel & 0x0f);
+        this.sendMidi(status, note, 0);
+    }
+
+    emitNarrationPulse(charIndex = 0, totalChars = 1, boundaryName = 'word') {
+        const progress = Math.max(0, Math.min(1, (Number(charIndex) || 0) / Math.max(1, Number(totalChars) || 1)));
+        const scale = [0, 2, 3, 5, 7, 10, 12];
+        const step = Math.floor(progress * (scale.length - 1));
+        const baseNote = 52;
+        const note = baseNote + scale[step];
+        const isSentence = boundaryName === 'sentence';
+        const velocity = Math.round(62 + progress * 42 + (isSentence ? 16 : 0));
+        const clampedVelocity = Math.max(0, Math.min(127, velocity));
+
+        // Always drive visual-reactive pulses.
+        this.noteTriggerHandler?.(note, clampedVelocity);
+
+        // Intentionally do not send RNBO/MIDI notes for narration boundaries.
+        // Narration should only drive visual-reactive pulses.
+    }
+
+    clearNarrationPulses() {
+        if (this.activeNarrationNotes.size === 0) return;
+        [...this.activeNarrationNotes].forEach((note) => this.noteOff(note, this.narrationChannel));
+        this.activeNarrationNotes.clear();
+    }
+
+    isEditableTarget(target) {
+        if (!target) return false;
+        const tagName = target.tagName?.toLowerCase?.();
+        if (tagName === 'input' || tagName === 'textarea' || tagName === 'select') return true;
+        return target.isContentEditable === true;
+    }
+
+    panicKeyboardNotes() {
+        for (const note of this.activeKeyboardNotes) {
+            this.noteOff(note, 0);
+        }
+        this.activeKeyboardNotes.clear();
+    }
+
+    attachComputerKeyboard() {
+        if (this.keyboardAttached || typeof window === 'undefined') return;
+
+        const onKeyDown = (event) => {
+            if (event.repeat) return;
+            if (this.isEditableTarget(event.target)) return;
+
+            const note = this.keyMap[event.key.toLowerCase()];
+            if (typeof note !== 'number') return;
+            if (this.activeKeyboardNotes.has(note)) return;
+
+            event.preventDefault();
+            this.activeKeyboardNotes.add(note);
+            this.noteOn(note, 100, 0);
+        };
+
+        const onKeyUp = (event) => {
+            const note = this.keyMap[event.key.toLowerCase()];
+            if (typeof note !== 'number') return;
+            if (!this.activeKeyboardNotes.has(note)) return;
+
+            event.preventDefault();
+            this.activeKeyboardNotes.delete(note);
+            this.noteOff(note, 0);
+        };
+
+        const onWindowBlur = () => {
+            this.panicKeyboardNotes();
+        };
+
+        const onVisibilityChange = () => {
+            if (document.hidden) {
+                this.panicKeyboardNotes();
+            }
+        };
+
+        this.keyboardHandlers = {
+            onKeyDown,
+            onKeyUp,
+            onWindowBlur,
+            onVisibilityChange
+        };
+
+        window.addEventListener('keydown', onKeyDown);
+        window.addEventListener('keyup', onKeyUp);
+        window.addEventListener('blur', onWindowBlur);
+        document.addEventListener('visibilitychange', onVisibilityChange);
+        this.keyboardAttached = true;
+    }
+
+    detachComputerKeyboard() {
+        if (!this.keyboardAttached || !this.keyboardHandlers || typeof window === 'undefined') return;
+
+        const { onKeyDown, onKeyUp, onWindowBlur, onVisibilityChange } = this.keyboardHandlers;
+        window.removeEventListener('keydown', onKeyDown);
+        window.removeEventListener('keyup', onKeyUp);
+        window.removeEventListener('blur', onWindowBlur);
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+
+        this.panicKeyboardNotes();
+        this.keyboardHandlers = null;
+        this.keyboardAttached = false;
     }
 
     /**
@@ -225,10 +408,8 @@ class AudioSystem {
      * @param {number} value - Value (mapped from UI)
      */
     setParameter(param, value) {
-        if (!this.rnboDevice) {
-            console.warn('RNBO device not initialized');
-            return;
-        }
+        this.params[param] = value;
+        if (!this.rnboDevice) return;
 
         // Debug: Log available parameters once
         if (!this._hasLoggedParams) {
@@ -242,7 +423,6 @@ class AudioSystem {
         if (rnboParam) {
             // console.log(`Setting RNBO param ${param} to ${value}`);
             rnboParam.value = value;
-            this.params[param] = value;
         } else {
             console.warn(`RNBO parameter '${param}' not found. Trying partial match...`);
             // Try partial match for things like "feedback" matching "feedback[1]"
@@ -250,7 +430,6 @@ class AudioSystem {
             if (partialParam) {
                 console.log(`Found partial match for '${param}': ${partialParam.name} (${partialParam.id})`);
                 partialParam.value = value;
-                this.params[param] = value;
             } else {
                 console.warn(`RNBO parameter '${param}' strictly not found`);
             }

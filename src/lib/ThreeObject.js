@@ -6,15 +6,33 @@ import { audioSystem } from '$lib/AudioSystem.js';
 // Create a new TextureLoader
 const loader = new TextureLoader();
 
-// Load your image from the static folder
+const createPlaceholderTexture = () => {
+    const dataTexture = new THREE.DataTexture(
+        new Uint8Array([0, 0, 0, 255]),
+        1,
+        1,
+        THREE.RGBAFormat
+    );
+    dataTexture.needsUpdate = true;
+    return dataTexture;
+};
+
+const safeLoadTexture = (url) => {
+    if (typeof document === 'undefined') {
+        return createPlaceholderTexture();
+    }
+    return loader.load(url);
+};
+
+// Load images only in the browser; use placeholders during SSR.
 const texture = [
-    loader.load(`${base}/my-photo.webp`),
-    loader.load(`${base}/my-photo2.webp`),
-    loader.load(`${base}/photo3.webp`),
-    loader.load(`${base}/photo4.webp`),
-    loader.load(`${base}/photo5.webp`),
-    loader.load(`${base}/photo6.webp`),
-    loader.load(`${base}/photo8.webp`),
+    safeLoadTexture(`${base}/my-photo.webp`),
+    safeLoadTexture(`${base}/my-photo2.webp`),
+    safeLoadTexture(`${base}/photo3.webp`),
+    safeLoadTexture(`${base}/photo4.webp`),
+    safeLoadTexture(`${base}/photo5.webp`),
+    safeLoadTexture(`${base}/photo6.webp`),
+    safeLoadTexture(`${base}/photo8.webp`),
 ];
 
 const ABOUT_TEXT_LINES = [
@@ -295,7 +313,9 @@ const baseDirectionalLight2Intensity = directionalLight2.intensity;
 
 let z = 5;
 let m = 0.2;
-let CAMERA = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, m, z);
+const initialViewportWidth = typeof window === 'undefined' ? 1920 : window.innerWidth;
+const initialViewportHeight = typeof window === 'undefined' ? 1080 : window.innerHeight;
+let CAMERA = new THREE.PerspectiveCamera(75, initialViewportWidth / initialViewportHeight, m, z);
 CAMERA.position.z = 2.2;
 const baseCameraFov = 75;
 const focusCameraFov = 56;
@@ -1206,6 +1226,14 @@ export const destroyScene = () => {
     if (animationFrameId) {
         cancelAnimationFrame(animationFrameId);
         animationFrameId = null;
+    }
+
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+        unregisterNoteTriggerHandler();
+        if (audioSystem && typeof audioSystem.detachComputerKeyboard === 'function') {
+            audioSystem.detachComputerKeyboard();
+        }
+        return;
     }
 
     window.removeEventListener('resize', resize);

@@ -14,6 +14,8 @@ class AudioSystem {
         this.isInitialized = false;
         this.rnboPkg = null;
         this.volume = 0.6;
+        this.previousEnergy = 0;
+        this.smoothedOnset = 0;
 
         // Parameter state
         this.params = {
@@ -89,10 +91,12 @@ class AudioSystem {
 
     /**
      * Gets current audio analysis data.
-     * @returns {Object} { low, mid, high } normalized 0-1
+     * @returns {Object} Rich audio features normalized around 0-1
      */
     getAnalysis() {
-        if (!this.analyser) return { low: 0, mid: 0, high: 0 };
+        if (!this.analyser) {
+            return { low: 0, mid: 0, high: 0, energy: 0, onset: 0, sparkle: 0 };
+        }
 
         const bufferLength = this.analyser.frequencyBinCount;
         const dataArray = new Uint8Array(bufferLength);
@@ -114,11 +118,17 @@ class AudioSystem {
             else high += val;
         }
 
-        return {
-            low: low / lowBound,
-            mid: mid / (midBound - lowBound),
-            high: high / (bufferLength - midBound)
-        };
+        const lowN = low / lowBound;
+        const midN = mid / (midBound - lowBound);
+        const highN = high / (bufferLength - midBound);
+        const energy = (lowN * 0.45 + midN * 0.35 + highN * 0.2);
+        const onsetRaw = Math.max(0, energy - this.previousEnergy);
+        this.previousEnergy = energy;
+        this.smoothedOnset = this.smoothedOnset * 0.75 + onsetRaw * 0.25;
+        const onset = Math.min(this.smoothedOnset * 2.8, 1);
+        const sparkle = Math.min(Math.max((highN - midN) * 1.6, 0), 1);
+
+        return { low: lowN, mid: midN, high: highN, energy, onset, sparkle };
     }
 
     async loadRNBOPatch() {

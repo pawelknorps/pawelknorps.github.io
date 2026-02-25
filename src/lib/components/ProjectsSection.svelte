@@ -11,6 +11,25 @@
 	const dispatch = createEventDispatcher();
 	let observer;
 
+	const getYear = (project) => {
+		if (project?.releaseDate) {
+			const d = new Date(project.releaseDate);
+			if (!Number.isNaN(d.getTime())) return d.getFullYear();
+		}
+		if (project?.year) return Number(project.year);
+		return null;
+	};
+
+	const getRecencyTag = (project) => {
+		const year = getYear(project);
+		if (!year) return "Catalog";
+		const current = new Date().getFullYear();
+		const age = current - year;
+		if (age <= 1) return "New";
+		if (age <= 3) return "Recent";
+		return "Catalog";
+	};
+
 	// Lazy load action
 	const lazyLoad = (node, params) => {
 		const options = {
@@ -163,10 +182,11 @@
 					data.links.instagram.includes("instagram.com/reel/"))
 					? data.links.instagram
 					: null}
+			{@const recencyTag = getRecencyTag(data)}
 
 			<div
 				id="music-{i}"
-				class="group my-14 md:my-20 translate-y-0 md:hover:-translate-y-4 xl:hover:-translate-y-6 duration-[400ms] ease-in-out w-full md:w-[40rem] lg:w-[30rem] xl:w-[48rem] 2xl:w-[56rem] project-card pointer-events-auto"
+				class="group my-14 md:my-20 translate-y-0 md:hover:-translate-y-4 xl:hover:-translate-y-6 duration-[400ms] ease-in-out w-full md:w-[40rem] lg:w-[30rem] xl:w-[48rem] 2xl:w-[56rem] project-card pointer-events-auto {recencyTag === 'New' ? 'project-fresh' : recencyTag === 'Recent' ? 'project-recent' : 'project-catalog'}"
 				in:fade={{ delay: 250 * i, duration: 1000 }}
 			>
 				{#if youtubeId}
@@ -185,6 +205,7 @@
 								style="background: none;"
 								class="text-[#FF0080]">.</mark
 							>&nbsp;{data.title}
+							<span class="recency-chip">{recencyTag}</span>
 						</h2>
 
 						<!-- Video Container -->
@@ -546,9 +567,10 @@
 			<mark style="background: none;" class="text-[#FF0080]">//</mark> OTHER
 		</h3>
 		{#each programmingProjects as data, i}
+			{@const recencyTag = getRecencyTag(data)}
 			<div
 				id="programming-{i}"
-				class="group my-14 md:my-20 translate-y-0 md:hover:-translate-y-4 xl:hover:-translate-y-6 duration-[400ms] ease-in-out w-full md:w-[40rem] lg:w-[30rem] xl:w-[48rem] 2xl:w-[56rem] project-card pointer-events-auto"
+				class="group my-14 md:my-20 translate-y-0 md:hover:-translate-y-4 xl:hover:-translate-y-6 duration-[400ms] ease-in-out w-full md:w-[40rem] lg:w-[30rem] xl:w-[48rem] 2xl:w-[56rem] project-card pointer-events-auto {recencyTag === 'New' ? 'project-fresh' : recencyTag === 'Recent' ? 'project-recent' : 'project-catalog'}"
 				in:fade={{
 					delay: 250 * (i + musicProjects.length),
 					duration: 1000,
@@ -572,6 +594,7 @@
 								style="background: none;"
 								class="text-[#FF0080]">.</mark
 							>&nbsp;{data.title}
+							<span class="recency-chip">{recencyTag}</span>
 						</h2>
 						<h2
 							class="text-md font-base mb-6 leading-relaxed adaptive-subtext"
@@ -660,6 +683,29 @@
 		box-shadow:
 			0 4px 24px -1px rgba(0, 0, 0, 0.2),
 			0 0 0 1px rgba(255, 255, 255, 0.02) inset;
+	}
+	.project-fresh {
+		border-color: rgba(12, 198, 255, 0.45);
+	}
+	.project-recent {
+		border-color: rgba(255, 0, 128, 0.32);
+	}
+	.project-catalog {
+		border-color: rgba(255, 255, 255, 0.1);
+	}
+	.recency-chip {
+		display: inline-flex;
+		align-items: center;
+		margin-left: 0.7rem;
+		font-size: 0.55rem;
+		font-weight: 700;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		padding: 0.24rem 0.42rem;
+		border-radius: 999px;
+		border: 1px solid rgba(255, 255, 255, 0.25);
+		color: rgba(255, 255, 255, 0.82);
+		vertical-align: middle;
 	}
 
 	.project-card::before {

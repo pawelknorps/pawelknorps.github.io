@@ -64,6 +64,7 @@
 
 	// Audio state tracking
 	let isAudioEnabled = false;
+	let immersiveMode = false;
 
 	onMount(async () => {
 		// Wait for DOM to be ready
@@ -96,10 +97,30 @@
 		} else {
 			setTimeout(loadComponent, 2000);
 		}
+
+		const onKey = (event) => {
+			if (event.key.toLowerCase() === "m") {
+				toggleImmersiveMode();
+			}
+		};
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
 	});
 
 	const handleAudioReq = () => {
 		isAudioEnabled = true;
+	};
+
+	const toggleImmersiveMode = async () => {
+		immersiveMode = !immersiveMode;
+		document.body.classList.toggle("immersive-mode", immersiveMode);
+		if (immersiveMode && document.fullscreenEnabled && !document.fullscreenElement) {
+			try {
+				await document.documentElement.requestFullscreen();
+			} catch (e) {
+				// Ignore fullscreen errors; keep immersive style mode.
+			}
+		}
 	};
 
 </script>
@@ -210,13 +231,23 @@
 	</div>
 {/if}
 
-{#if AudioControlsComponent}
+{#if AudioControlsComponent && !immersiveMode}
 	<svelte:component this={AudioControlsComponent} />
 {/if}
-<SocialBubbles />
+{#if !immersiveMode}
+	<SocialBubbles />
+{/if}
+
+<button
+	type="button"
+	class="immersive-toggle fixed bottom-4 left-4 z-50"
+	on:click={toggleImmersiveMode}
+>
+	{immersiveMode ? "Exit Performance" : "Performance Mode"}
+</button>
 
 <!-- Seamless flowing content -->
-<div class="seamless-flow">
+<div class="seamless-flow" class:immersive-active={immersiveMode}>
 	<HeroSection {adaptiveTextClass} />
 	<!-- Projects naturally flowing from bottom of page with biographical text -->
 	<div class="projects-flow relative w-full px-4 md:px-8 xl:px-16 2xl:px-24 content-visibility-auto">
@@ -267,6 +298,10 @@
 		z-index: 10; /* Higher z-index for content */
 		pointer-events: none; /* Allow clicks to pass through to canvas */
 	}
+	.seamless-flow.immersive-active {
+		opacity: 0.24;
+		transition: opacity 300ms ease;
+	}
 
 	/* Projects flow seamlessly */
 	.projects-flow {
@@ -281,6 +316,18 @@
 		animation: gentlePulse 2s ease-in-out infinite;
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
+	}
+	.immersive-toggle {
+		padding: 0.45rem 0.8rem;
+		border-radius: 999px;
+		border: 1px solid rgba(255, 255, 255, 0.25);
+		background: rgba(0, 0, 0, 0.55);
+		backdrop-filter: blur(8px);
+		font-size: 0.68rem;
+		letter-spacing: 0.09em;
+		text-transform: uppercase;
+		color: white;
+		pointer-events: auto;
 	}
 
 	@keyframes gentlePulse {

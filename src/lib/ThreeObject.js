@@ -135,12 +135,19 @@ export const loadTextures = () => {
 let Renderer;
 let composer = null;
 let bloomPass = null;
+let rendererKind = 'webgl';
 const SCENE = new THREE.Scene();
 let sceneCanvas = null;
 let animationFrameId = null;
 let isSceneDestroyed = false;
 let maxDevicePixelRatio = 1.75;
 let scrollNorm = 0;
+let performanceTier = 'balanced';
+let particleCountPerProject = 5;
+let benchmarkFrames = 0;
+let benchmarkStartTime = 0;
+let lastFrameTime = 0;
+let isBenchmarking = true;
 let n = 0.2;
 
 // Drag controls variables
@@ -253,6 +260,46 @@ const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.2);
 directionalLight2.position.set(-1, 0, 1);
 SCENE.add(directionalLight2);
 SCENE.add(directionalLight);
+
+const createSignatureBillboard = () => {
+    const textCanvas = document.createElement('canvas');
+    textCanvas.width = 1024;
+    textCanvas.height = 256;
+    const ctx = textCanvas.getContext('2d');
+    if (!ctx) return null;
+
+    const gradient = ctx.createLinearGradient(0, 0, textCanvas.width, 0);
+    gradient.addColorStop(0, 'rgba(255,0,122,0.95)');
+    gradient.addColorStop(0.5, 'rgba(255,255,255,0.96)');
+    gradient.addColorStop(1, 'rgba(12,198,255,0.95)');
+    ctx.fillStyle = 'rgba(0,0,0,0)';
+    ctx.fillRect(0, 0, textCanvas.width, textCanvas.height);
+    ctx.font = '700 124px "Syne", "Arial Black", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(255, 0, 120, 0.45)';
+    ctx.shadowBlur = 28;
+    ctx.fillStyle = gradient;
+    ctx.fillText('PAWEL KNORPS', textCanvas.width / 2, textCanvas.height / 2);
+
+    const textTexture = new THREE.CanvasTexture(textCanvas);
+    textTexture.colorSpace = THREE.SRGBColorSpace;
+    const material = new THREE.MeshBasicMaterial({
+        map: textTexture,
+        transparent: true,
+        opacity: 0.84,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+    });
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 0.48), material);
+    plane.position.set(0, -1.65, 0.2);
+    return plane;
+};
+
+const signatureBillboard = browser ? createSignatureBillboard() : null;
+if (signatureBillboard) {
+    SCENE.add(signatureBillboard);
+}
 
 let CAMERA;
 if (browser) {
@@ -583,7 +630,6 @@ export const updateProjects = (musicProjects, programmingProjects) => {
     if (allProjects.length === 0) return;
 
     // Create Instanced Geometry
-    const particleCountPerProject = 5;
     const baseGeometry = new THREE.BufferGeometry();
     const vertices = new Float32Array(particleCountPerProject * 3);
     for (let i = 0; i < particleCountPerProject; i++) {
@@ -698,6 +744,66 @@ export const updateProjects = (musicProjects, programmingProjects) => {
 
 let currentFocusedId = null;
 
+const chapterTimeline = [
+    { start: 0.0, end: 0.22, cameraZ: 2.2, cameraY: 0.08, cameraX: 0.0, bloom: 0.42, radius: 0.28, autoRot: 0.00015 },
+    { start: 0.22, end: 0.5, cameraZ: 2.85, cameraY: 0.18, cameraX: 0.04, bloom: 0.58, radius: 0.34, autoRot: 0.0002 },
+    { start: 0.5, end: 0.78, cameraZ: 3.45, cameraY: 0.32, cameraX: -0.05, bloom: 0.72, radius: 0.39, autoRot: 0.00025 },
+    { start: 0.78, end: 1.0, cameraZ: 4.2, cameraY: 0.44, cameraX: 0.02, bloom: 0.92, radius: 0.45, autoRot: 0.0003 }
+];
+
+const smoothStep = (t) => t * t * (3 - 2 * t);
+const lerp = (a, b, t) => a + (b - a) * t;
+
+const detectPerformanceTier = () => {
+    if (!browser) return 'balanced';
+    const memory = navigator.deviceMemory || 8;
+    const cores = navigator.hardwareConcurrency || 4;
+    const mobile = window.innerWidth < 900;
+
+    if (mobile || memory <= 4 || cores <= 4) return 'low';
+    if (memory >= 8 && cores >= 8) return 'ultra';
+    return 'balanced';
+};
+
+const applyTierSettings = () => {
+    if (performanceTier === 'low') {
+        maxDevicePixelRatio = 1.1;
+        particleCountPerProject = 3;
+        return;
+    }
+    if (performanceTier === 'ultra') {
+        maxDevicePixelRatio = 2.0;
+        particleCountPerProject = 8;
+        return;
+    }
+    maxDevicePixelRatio = 1.5;
+    particleCountPerProject = 5;
+};
+
+const tuneTierAfterBenchmark = (fps) => {
+    if (fps < 38) performanceTier = 'low';
+    else if (fps > 58 && performanceTier !== 'low') performanceTier = 'ultra';
+    else performanceTier = 'balanced';
+    applyTierSettings();
+};
+
+const getChapterState = (norm) => {
+    const chapter = chapterTimeline.find((c) => norm >= c.start && norm <= c.end) || chapterTimeline[chapterTimeline.length - 1];
+    const idx = chapterTimeline.indexOf(chapter);
+    const next = chapterTimeline[Math.min(idx + 1, chapterTimeline.length - 1)];
+    const range = Math.max(chapter.end - chapter.start, 0.001);
+    const t = smoothStep(Math.min(Math.max((norm - chapter.start) / range, 0), 1));
+
+    return {
+        cameraZ: lerp(chapter.cameraZ, next.cameraZ, t),
+        cameraY: lerp(chapter.cameraY, next.cameraY, t),
+        cameraX: lerp(chapter.cameraX, next.cameraX, t),
+        bloom: lerp(chapter.bloom, next.bloom, t),
+        radius: lerp(chapter.radius, next.radius, t),
+        autoRot: lerp(chapter.autoRot, next.autoRot, t)
+    };
+};
+
 /**
  * Focuses on a specific project by ID.
  * Rotates the sphere and triggers visual effects.
@@ -779,6 +885,18 @@ const animate = async () => {
     animationFrameId = requestAnimationFrame(animate);
 
     const now = performance.now();
+    if (!lastFrameTime) lastFrameTime = now;
+    if (isBenchmarking) {
+        if (!benchmarkStartTime) benchmarkStartTime = now;
+        benchmarkFrames += 1;
+        if (benchmarkFrames >= 50) {
+            const elapsed = Math.max(now - benchmarkStartTime, 1);
+            const fps = (benchmarkFrames * 1000) / elapsed;
+            tuneTierAfterBenchmark(fps);
+            isBenchmarking = false;
+        }
+    }
+    lastFrameTime = now;
 
     // Update time uniform for sphere's noise animation
     SPHERE.material.uniforms.time.value = now * 0.00001;
@@ -788,12 +906,16 @@ const animate = async () => {
         const analysis = audioSystem.getAnalysis();
 
         // Smooth interpolation (Lerp)
-        const lerp = (start, end, factor) => start + (end - start) * factor;
         const smoothFactor = 0.1; // Lower = smoother
 
         SPHERE.material.uniforms.uAudioLow.value = lerp(SPHERE.material.uniforms.uAudioLow.value, analysis.low, smoothFactor);
         SPHERE.material.uniforms.uAudioMid.value = lerp(SPHERE.material.uniforms.uAudioMid.value, analysis.mid, smoothFactor);
         SPHERE.material.uniforms.uAudioHigh.value = lerp(SPHERE.material.uniforms.uAudioHigh.value, analysis.high, smoothFactor);
+
+        if (bloomPass) {
+            bloomPass.strength += analysis.onset * 0.12;
+            bloomPass.radius += analysis.sparkle * 0.03;
+        }
     }
 
     const uniforms = SPHERE.material.uniforms;
@@ -869,8 +991,9 @@ const animate = async () => {
     }
 
     // Apply rotation to sphere and project points
-    const autoRotationX = now * 0.00019;
-    const autoRotationY = now * 0.00019;
+    const chapterState = getChapterState(scrollNorm);
+    const autoRotationX = now * chapterState.autoRot;
+    const autoRotationY = now * chapterState.autoRot;
 
     SPHERE.rotation.x = sphereRotation.x + autoRotationX;
     SPHERE.rotation.y = sphereRotation.y + autoRotationY;
@@ -878,18 +1001,22 @@ const animate = async () => {
     projectPoints.rotation.y = sphereRotation.y + autoRotationY;
 
     // Scroll choreography: cinematic dolly + slight orbit drift
-    const targetCamZ = 2.25 + scrollNorm * 1.8;
-    const targetCamY = 0.06 + scrollNorm * 0.36;
-    const targetCamX = Math.sin(now * 0.00017) * 0.08;
+    const targetCamZ = chapterState.cameraZ;
+    const targetCamY = chapterState.cameraY;
+    const targetCamX = chapterState.cameraX + Math.sin(now * 0.00017) * 0.05;
     CAMERA.position.z += (targetCamZ - CAMERA.position.z) * 0.025;
     CAMERA.position.y += (targetCamY - CAMERA.position.y) * 0.03;
     CAMERA.position.x += (targetCamX - CAMERA.position.x) * 0.02;
     CAMERA.lookAt(0, 0, 0);
+    if (signatureBillboard) {
+        signatureBillboard.position.y = -1.6 + Math.sin(now * 0.0012) * 0.03;
+        signatureBillboard.lookAt(CAMERA.position);
+    }
 
     n = 0.2 + scrollNorm * 0.95;
     if (bloomPass) {
-        bloomPass.strength = 0.45 + scrollNorm * 0.55;
-        bloomPass.radius = 0.3 + scrollNorm * 0.2;
+        bloomPass.strength = chapterState.bloom;
+        bloomPass.radius = chapterState.radius;
     }
 
     // Update instanced particles
@@ -923,7 +1050,7 @@ const animate = async () => {
         instancedParticleSystem.geometry.attributes.aDestructionFactor.needsUpdate = true;
     }
 
-    if (composer) {
+    if (composer && rendererKind === 'webgl') {
         composer.render();
     } else if (Renderer) {
         Renderer.render(SCENE, CAMERA);
@@ -1209,21 +1336,46 @@ const createCinemaBackground = (videoFilename) => {
 export const setScene = async (canvas) => {
     isSceneDestroyed = false;
     sceneCanvas = canvas;
-    Renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
-    Renderer.outputColorSpace = THREE.SRGBColorSpace;
+    performanceTier = detectPerformanceTier();
+    applyTierSettings();
+
+    let createdWebGPU = false;
+    if (navigator.gpu && performanceTier === 'ultra') {
+        try {
+            const webgpu = await import('three/webgpu');
+            const WebGPURenderer = webgpu.WebGPURenderer;
+            if (WebGPURenderer) {
+                Renderer = new WebGPURenderer({ canvas, antialias: true, alpha: true });
+                if (Renderer.init) {
+                    await Renderer.init();
+                }
+                rendererKind = 'webgpu';
+                createdWebGPU = true;
+            }
+        } catch (e) {
+            createdWebGPU = false;
+        }
+    }
+
+    if (!createdWebGPU) {
+        Renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+        Renderer.outputColorSpace = THREE.SRGBColorSpace;
+        rendererKind = 'webgl';
+    }
     Renderer.setClearColor(0x000000, 0); // Transparent background
-    maxDevicePixelRatio = window.innerWidth < 820 ? 1.15 : 1.75;
 
     // Postprocessing pipeline for a cinematic look.
-    composer = new EffectComposer(Renderer);
-    composer.addPass(new RenderPass(SCENE, CAMERA));
-    bloomPass = new UnrealBloomPass(
-        new THREE.Vector2(window.innerWidth, window.innerHeight),
-        0.55,
-        0.35,
-        0.82
-    );
-    composer.addPass(bloomPass);
+    if (rendererKind === 'webgl') {
+        composer = new EffectComposer(Renderer);
+        composer.addPass(new RenderPass(SCENE, CAMERA));
+        bloomPass = new UnrealBloomPass(
+            new THREE.Vector2(window.innerWidth, window.innerHeight),
+            0.55,
+            0.35,
+            0.82
+        );
+        composer.addPass(bloomPass);
+    }
 
     // --- Background Cinema Setup ---
     // Make sure 'demo.mp4' exists in your 'static' folder!
@@ -1293,5 +1445,13 @@ export const destroyScene = () => {
         composer = null;
     }
     bloomPass = null;
+    if (signatureBillboard) {
+        if (signatureBillboard.material && signatureBillboard.material.map) {
+            signatureBillboard.material.map.dispose();
+        }
+        if (signatureBillboard.material) signatureBillboard.material.dispose();
+        if (signatureBillboard.geometry) signatureBillboard.geometry.dispose();
+    }
+    rendererKind = 'webgl';
     sceneCanvas = null;
 };

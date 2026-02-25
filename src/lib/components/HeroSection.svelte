@@ -1,7 +1,7 @@
 <script>
 	import { createEventDispatcher } from 'svelte';
 
-	export let personalData;
+	export let personalData = {};
 	export let adaptiveTextClass;
 	export let bioFocusEnabled = false;
 
@@ -19,12 +19,12 @@
 			title="Toggle immersive bio focus"
 			class:text-white={adaptiveTextClass === 'text-white'}
 			class:text-gray-900={adaptiveTextClass === 'text-gray-900'}>
-			{personalData.name}
+			{personalData?.name || 'Paweł Knorps'}
 		</button>
 		<h2 class="text-2xl font-thin tracking-widest mt-6 ml-20 adaptive-text"
 			class:text-white={adaptiveTextClass === 'text-white'}
 			class:text-gray-900={adaptiveTextClass === 'text-gray-900'}>
-			&nbsp;{personalData.title} and <mark id="revelation" style="background: none; color: #FF0080;" class="font-black">guitarist.</mark>
+			&nbsp;{personalData?.title || 'Composer, Bassist, Producer'} and <mark id="revelation" style="background: none; color: #FF0080;" class="font-black">guitarist.</mark>
 		</h2>
 		<h2
 			class="text-2xl xl:text-3xl 2xl:text-4xl font-thin tracking-widest mt-6 text-center md:text-left md:ml-20 adaptive-text"

@@ -275,9 +275,9 @@
 		
         // ✅ portfolioData już jest z `load()`, nie fetchuj go ponownie
 		if (portfolioData) {
-			personalData = portfolioData.personal;
-			musicProjects = portfolioData.musicProjects;
-			programmingProjects = portfolioData.programmingProjects;
+			personalData = portfolioData.personal ?? {};
+			musicProjects = Array.isArray(portfolioData.musicProjects) ? portfolioData.musicProjects : [];
+			programmingProjects = Array.isArray(portfolioData.programmingProjects) ? portfolioData.programmingProjects : [];
 			
 			console.log('Portfolio data loaded:', {
 				personal: !!personalData,

@@ -414,6 +414,7 @@
 		});
 
 		setupNarrationVoice();
+		audioSystem.attachComputerKeyboard?.();
 		if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
 			window.speechSynthesis.onvoiceschanged = setupNarrationVoice;
 		}

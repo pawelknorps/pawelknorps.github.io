@@ -13,7 +13,7 @@ class AudioSystem {
         this.analyser = null; // Audio analysis
         this.isInitialized = false;
         this.rnboPkg = null;
-        this.volume = 0.6;
+        this.volume = 0.52;
 
         // Parameter state
         this.params = {
@@ -41,9 +41,15 @@ class AudioSystem {
         this.noteTriggerHandler = null;
         this.userSoundProfile = null;
         this.userSoundProfileVersion = 2;
+        this.initPromise = null;
     }
 
     async init() {
+        if (this.initPromise) {
+            await this.initPromise;
+            return;
+        }
+
         if (this.isInitialized) {
             if (this.audioContext?.state === 'suspended') {
                 await this.audioContext.resume();
@@ -53,7 +59,7 @@ class AudioSystem {
             return;
         }
 
-        try {
+        this.initPromise = (async () => {
             this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
             if (this.audioContext.state === 'suspended') {
@@ -101,8 +107,14 @@ class AudioSystem {
             // Welcome chime
             this.playWelcomeSound();
 
+        })();
+
+        try {
+            await this.initPromise;
         } catch (error) {
             console.warn('Audio initialization failed:', error);
+        } finally {
+            this.initPromise = null;
         }
     }
 
@@ -347,9 +359,19 @@ class AudioSystem {
     attachComputerKeyboard() {
         if (this.keyboardAttached || typeof window === 'undefined') return;
 
-        const onKeyDown = (event) => {
+        const onKeyDown = async (event) => {
             if (event.repeat) return;
             if (this.isEditableTarget(event.target)) return;
+
+            if (!this.isInitialized) {
+                event.preventDefault();
+                try {
+                    await this.init();
+                } catch (error) {
+                    console.warn('Keyboard audio bootstrap failed:', error);
+                    return;
+                }
+            }
 
             const note = this.keyMap[event.key.toLowerCase()];
             if (typeof note !== 'number') return;
@@ -452,7 +474,7 @@ class AudioSystem {
         welcome.frequency.setValueAtTime(880, currentTime); // A5
 
         const welcomeGain = this.audioContext.createGain();
-        welcomeGain.gain.setValueAtTime(0.5, currentTime);
+        welcomeGain.gain.setValueAtTime(0.3, currentTime);
         welcomeGain.gain.exponentialRampToValueAtTime(0.001, currentTime + 1.0);
 
         welcome.connect(welcomeGain);
@@ -501,8 +523,8 @@ class AudioSystem {
         filter2.Q.setValueAtTime(1.5, currentTime);
 
         const dragGain = this.audioContext.createGain();
-        dragGain.gain.setValueAtTime(0.25, currentTime);
-        dragGain.gain.exponentialRampToValueAtTime(0.01, currentTime + 0.5);
+        dragGain.gain.setValueAtTime(0.16, currentTime);
+        dragGain.gain.exponentialRampToValueAtTime(0.006, currentTime + 0.5);
 
         // Complex signal routing
         grain1.connect(filter1);
@@ -568,7 +590,7 @@ class AudioSystem {
         filter2.Q.setValueAtTime(2, currentTime);
 
         const clickGain = this.audioContext.createGain();
-        clickGain.gain.setValueAtTime(0.135, currentTime);
+        clickGain.gain.setValueAtTime(0.09, currentTime);
         clickGain.gain.exponentialRampToValueAtTime(0.001, currentTime + 2.5);
 
         // Routing through effects
@@ -653,7 +675,7 @@ class AudioSystem {
         filter.Q.setValueAtTime(1.8 + Math.random() * 2.4, currentTime);
         stereo.pan.setValueAtTime(-0.35 + Math.random() * 0.7, currentTime);
 
-        const target = Math.max(0.008, Math.min(0.06, 0.014 + intensity * 0.035));
+        const target = Math.max(0.016, Math.min(0.11, 0.024 + intensity * 0.065));
         gain.gain.setValueAtTime(0.0001, currentTime);
         gain.gain.exponentialRampToValueAtTime(target, currentTime + 0.2);
         gain.gain.exponentialRampToValueAtTime(0.0001, currentTime + 1.8 + Math.random() * 1.4);

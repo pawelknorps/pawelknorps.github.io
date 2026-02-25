@@ -706,10 +706,16 @@ let noteTriggerRegistered = false;
 let animationStarted = false;
 let animationFrameId = null;
 let sceneCanvas = null;
+let scrollVelocity = 0;
+let lastAmbientNoiseTime = 0;
+let nextAmbientNoiseDelay = 4200;
 
 // Scroll tracking
 const updateScrollPosition = () => {
+    const previous = scrollPosition;
     scrollPosition = window.pageYOffset || document.documentElement.scrollTop;
+    const delta = scrollPosition - previous;
+    scrollVelocity = lerp(scrollVelocity, delta, 0.22);
     const scrollMultiplier = 1 + (scrollPosition / 1000) * 2;
     morphSpeed = baseMorphSpeed * Math.min(scrollMultiplier, 5);
 };
@@ -746,6 +752,9 @@ const animate = async () => {
     SPHERE.material.uniforms.time.value = now * 0.00001;
 
     const uniforms = SPHERE.material.uniforms;
+    const viewportHeight = Math.max(1, window.innerHeight || 1);
+    const scrollNorm = clamp(scrollPosition / (viewportHeight * 1.8), 0, 1.25);
+    const scrollVelocityNorm = clamp(Math.abs(scrollVelocity) / 28, 0, 1);
     aboutProjectionCurrent += (aboutProjectionTarget - aboutProjectionCurrent) * 0.06;
     uniforms.aboutTextIntensity.value = aboutProjectionCurrent;
     projectedVideoMixCurrent += (projectedVideoMixTarget - projectedVideoMixCurrent) * 0.06;
@@ -803,7 +812,8 @@ const animate = async () => {
         uniforms.uAudioHigh.value * 0.03 +
         Math.max(0, -scaleWave) * uniforms.uEnergy.value * 0.12;
     const signedScaleDelta = pulseScaleBoost - pulseScaleDip;
-    const sphereScale = baseSphereScale + (focusSphereScale - baseSphereScale) * bioFocusCurrent + signedScaleDelta;
+    const scrollScaleMod = Math.sin(now * 0.0018 + scrollPosition * 0.0035) * 0.045 * (0.35 + scrollNorm);
+    const sphereScale = baseSphereScale + (focusSphereScale - baseSphereScale) * bioFocusCurrent + signedScaleDelta + scrollScaleMod;
     const maxScaleForViewport = window.innerWidth < 900 ? 1.48 : 1.66;
     const clampedSphereScale = clamp(sphereScale, 0.78, maxScaleForViewport);
     SPHERE.scale.set(clampedSphereScale, clampedSphereScale, clampedSphereScale);
@@ -838,9 +848,9 @@ const animate = async () => {
     }
 
     // Apply rotation to sphere and project points
-    const energySpin = 1 + uniforms.uAudioMid.value * 0.45 + uniforms.uAudioHigh.value * 0.2;
+    const energySpin = 1 + uniforms.uAudioMid.value * 0.45 + uniforms.uAudioHigh.value * 0.2 + scrollNorm * 0.33;
     const autoRotationX = now * 0.00014 * energySpin;
-    const autoRotationY = now * 0.00014 * (1 + uniforms.uAudioLow.value * 0.3);
+    const autoRotationY = now * 0.00014 * (1 + uniforms.uAudioLow.value * 0.3 + scrollNorm * 0.26);
     
     SPHERE.rotation.x = sphereRotation.x + autoRotationX;
     SPHERE.rotation.y = sphereRotation.y + autoRotationY;
@@ -862,8 +872,19 @@ const animate = async () => {
     const projectPointsVisible = bioFocusCurrent < 0.92;
     projectPoints.visible = projectPointsVisible;
     projectPoints.scale.setScalar(1 - bioFocusCurrent * 0.3);
-    CAMERA.position.x = lerp(CAMERA.position.x, Math.sin(now * 0.0016) * uniforms.uAudioHigh.value * 0.03, 0.04);
-    CAMERA.position.y = lerp(CAMERA.position.y, Math.cos(now * 0.0012) * uniforms.uAudioMid.value * 0.022, 0.04);
+    const scrollSwayX = Math.sin(scrollPosition * 0.002 + now * 0.0003) * 0.035 * scrollNorm;
+    const scrollSwayY = Math.cos(scrollPosition * 0.0017 + now * 0.0004) * 0.05 * scrollNorm;
+    CAMERA.position.x = lerp(CAMERA.position.x, Math.sin(now * 0.0016) * uniforms.uAudioHigh.value * 0.03 + scrollSwayX, 0.04);
+    CAMERA.position.y = lerp(CAMERA.position.y, Math.cos(now * 0.0012) * uniforms.uAudioMid.value * 0.022 + scrollSwayY, 0.04);
+
+    if (audioSystem && audioSystem.isInitialized) {
+        const ambientIntensity = clamp(uniforms.uEnergy.value * 0.45 + scrollVelocityNorm * 0.55, 0.2, 1);
+        if (now - lastAmbientNoiseTime > nextAmbientNoiseDelay) {
+            audioSystem.playAmbientNoise?.(ambientIntensity);
+            lastAmbientNoiseTime = now;
+            nextAmbientNoiseDelay = 2600 + Math.random() * 4600;
+        }
+    }
 
     // Update particle animations
     if (projectPointsVisible) {

@@ -27,7 +27,8 @@ class AudioSystem {
         this.lastCallTimes = {
             drag: 0,
             hover: 0,
-            click: 0
+            click: 0,
+            ambient: 0
         };
 
         this.keyMap = {
@@ -619,6 +620,44 @@ class AudioSystem {
         tremolo.start();
         hover.stop(currentTime + 1.8);
         tremolo.stop(currentTime + 1.8);
+    }
+
+    playAmbientNoise(intensity = 0.35) {
+        if (!this.isInitialized) return;
+
+        const now = performance.now();
+        if (now - this.lastCallTimes.ambient < 2200) return;
+        this.lastCallTimes.ambient = now;
+
+        const currentTime = this.audioContext.currentTime;
+        const tonal = this.audioContext.createOscillator();
+        const texture = this.audioContext.createOscillator();
+        const filter = this.audioContext.createBiquadFilter();
+        const gain = this.audioContext.createGain();
+
+        tonal.type = 'triangle';
+        texture.type = 'sawtooth';
+        tonal.frequency.setValueAtTime(120 + Math.random() * 80, currentTime);
+        texture.frequency.setValueAtTime(42 + Math.random() * 20, currentTime);
+
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(240 + Math.random() * 420, currentTime);
+        filter.Q.setValueAtTime(2.4 + Math.random() * 3.2, currentTime);
+
+        const target = Math.max(0.003, Math.min(0.03, 0.008 + intensity * 0.02));
+        gain.gain.setValueAtTime(0.0001, currentTime);
+        gain.gain.exponentialRampToValueAtTime(target, currentTime + 0.14);
+        gain.gain.exponentialRampToValueAtTime(0.0001, currentTime + 1.1 + Math.random() * 0.8);
+
+        tonal.connect(filter);
+        texture.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.masterGain);
+
+        tonal.start();
+        texture.start();
+        tonal.stop(currentTime + 1.9);
+        texture.stop(currentTime + 1.9);
     }
 
     playMorphSound(morphFactor) {

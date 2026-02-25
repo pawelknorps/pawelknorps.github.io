@@ -7,8 +7,41 @@
 	export let programmingProjects;
 	export let adaptiveTextClass;
 	export let adaptiveSubTextClass;
+	let loadedVideos = {};
 
 	const dispatch = createEventDispatcher();
+
+	const handleEnterViewport = (id) => {
+		if (!id || loadedVideos[id]) return;
+		loadedVideos = { ...loadedVideos, [id]: true };
+	};
+
+	function lazyLoad(node) {
+		if (typeof IntersectionObserver === 'undefined') {
+			node.dispatchEvent(new CustomEvent('enterViewport'));
+			return {};
+		}
+
+		const observer = new IntersectionObserver(
+			(entries) => {
+				entries.forEach((entry) => {
+					if (entry.isIntersecting) {
+						node.dispatchEvent(new CustomEvent('enterViewport'));
+						observer.unobserve(node);
+					}
+				});
+			},
+			{ rootMargin: '200px 0px', threshold: 0.01 }
+		);
+
+		observer.observe(node);
+
+		return {
+			destroy() {
+				observer.disconnect();
+			}
+		};
+	}
 
 	const openInApp = (event, project, type) => {
 		const media = resolveProjectMedia(project);

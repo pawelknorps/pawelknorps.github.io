@@ -1,7 +1,6 @@
 <script>
 	export let scrollY;
 	export let innerHeight;
-	export let projectsHeight;
 	export let adaptiveTextClass;
 	export let adaptiveSubTextClass;
 
@@ -115,32 +114,6 @@
 
 	.bio-text span {
 		font-weight: 600;
-	}
-
-	.achievements-section {
-		border-top: 1px solid rgba(255, 0, 128, 0.2);
-		padding-top: 1rem;
-		margin-top: 1rem;
-	}
-
-	.achievements-list {
-		max-height: none;
-	}
-
-	.achievement-item {
-		padding: 1rem 0;
-		border-left: 3px solid rgba(255, 0, 128, 0.3);
-		padding-left: 1.5rem;
-		margin-left: 0.75rem;
-		transition: all 0.3s ease;
-		line-height: 1.6;
-	}
-
-	.achievement-item:hover {
-		border-left-color: rgba(255, 0, 128, 0.8);
-		padding-left: 2rem;
-		background: rgba(255, 0, 128, 0.05);
-		border-radius: 0 8px 8px 0;
 	}
 
 	/* Custom scrollbar for bio text */

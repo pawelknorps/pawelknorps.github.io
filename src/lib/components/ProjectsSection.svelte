@@ -292,6 +292,7 @@
 										src="https://www.facebook.com/plugins/video.php?href={encodeURIComponent(
 											facebookUrl,
 										)}&show_text=false&t=0"
+										title={`${data.title} Facebook video`}
 										width="100%"
 										height="100%"
 										style="border:none;overflow:hidden;"
@@ -385,6 +386,7 @@
 								<iframe
 									width="100%"
 									height="166"
+									title={`${data.title} SoundCloud player`}
 									scrolling="no"
 									frameborder="no"
 									allow="autoplay"

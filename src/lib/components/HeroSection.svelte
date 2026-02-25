@@ -1,6 +1,5 @@
 <script>
 	export let adaptiveTextClass;
-	export let adaptiveSubTextClass;
 </script>
 
 <!-- Hero Section -->

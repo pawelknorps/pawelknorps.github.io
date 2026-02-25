@@ -224,7 +224,7 @@
 
 <!-- Seamless flowing content -->
 <div class="seamless-flow">
-	<HeroSection {adaptiveTextClass} {adaptiveSubTextClass} />
+	<HeroSection {adaptiveTextClass} />
 	<!-- Projects naturally flowing from bottom of page with biographical text -->
 	<div
 		class="projects-flow relative w-full px-4 md:px-8 xl:px-16 2xl:px-24 content-visibility-auto"
@@ -260,7 +260,6 @@
 					<BiographicalSection
 						{scrollY}
 						{innerHeight}
-						{projectsHeight}
 						{adaptiveTextClass}
 						{adaptiveSubTextClass}
 					/>
@@ -271,11 +270,6 @@
 </div>
 
 <style>
-	/* Smooth scrolling */
-	html {
-		scroll-behavior: smooth;
-	}
-
 	/* Seamless flow container */
 	.seamless-flow {
 		background: transparent;

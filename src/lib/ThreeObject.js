@@ -75,18 +75,13 @@ const createAboutTextTexture = () => {
     ctx.fillStyle = 'rgba(5, 8, 16, 0.0)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-    gradient.addColorStop(0, 'rgba(214, 243, 255, 1)');
-    gradient.addColorStop(0.5, 'rgba(255, 255, 255, 1)');
-    gradient.addColorStop(1, 'rgba(228, 244, 255, 1)');
-
-    ctx.font = '700 30px "Space Grotesk", "Sora", sans-serif';
-    ctx.fillStyle = gradient;
+    ctx.font = '600 28px "Space Grotesk", "Sora", sans-serif';
+    ctx.fillStyle = 'rgba(245, 247, 250, 0.92)';
     ctx.textBaseline = 'top';
-    ctx.shadowColor = 'rgba(8, 16, 38, 0.95)';
-    ctx.shadowBlur = 10;
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+    ctx.shadowBlur = 2;
 
-    const lineHeight = 50;
+    const lineHeight = 46;
     let y = 24;
     while (y < canvas.height + lineHeight) {
         const line = ABOUT_TEXT_LINES[Math.floor((y / lineHeight) % ABOUT_TEXT_LINES.length)];
@@ -105,15 +100,17 @@ const createAboutTextTexture = () => {
 
 let Renderer;
 const SCENE = new THREE.Scene();
-let n = 0.2;
+let n = 0;
 
 // Drag controls variables
 let isDragging = false;
 let previousMousePosition = { x: 0, y: 0 };
 let sphereRotation = { x: 0, y: 0 };
-let targetRotation = { x: 0, y: 0 };
+let rotationVelocity = { x: 0, y: 0 };
 const rotationSpeed = 0.008;
-const dampingFactor = 0.05;
+const dragVelocityBlend = 0.35;
+const rotationFriction = 0.94;
+const maxDragTilt = Math.PI * 0.48;
 let dragStartTime = 0;
 let hasMovedWhileDragging = false;
 
@@ -259,18 +256,17 @@ const morphShader = {
             vec4 baseColor = mix(color1, color2, morphFactor);
 
             vec2 textUv = vec2(
-                fract(vUv.x * 1.2 + time * 0.018),
-                fract(vUv.y * 2.0 - time * 0.012)
+                fract(vUv.x * 1.18 + time * 0.012),
+                fract(vUv.y * 1.92 - time * 0.008)
             );
+            textUv.x += sin((textUv.y * 46.0) + (time * 5.0)) * 0.0025;
             vec4 textColor = texture2D(tAboutText, textUv);
             float textMask = smoothstep(0.08, 0.9, textColor.a) * aboutTextIntensity;
-
-            float pulse = 0.6 + 0.4 * sin(time * 2.2 + vUv.y * 8.0);
-            vec3 hologram = mix(vec3(0.78, 0.92, 1.0), vec3(1.0, 1.0, 1.0), pulse);
-
-            float scanline = 1.0;
-            vec3 projected = baseColor.rgb + hologram * textMask * 0.95;
-            vec3 finalColor = mix(baseColor.rgb, projected, textMask) * scanline;
+            float letterPulse = 0.88 + 0.12 * sin((vUv.x * 90.0) + (vUv.y * 40.0) + (time * 3.2));
+            float scanline = 0.985 + 0.015 * sin((vUv.y + time * 0.04) * 260.0);
+            vec3 letterColor = vec3(0.98, 0.99, 1.0) * letterPulse;
+            vec3 projected = mix(baseColor.rgb, letterColor, textMask * 0.9);
+            vec3 finalColor = projected * scanline;
 
             vec2 videoUv = vec2(fract(vUv.x + time * 0.006), 1.0 - vUv.y);
             vec3 videoColor = texture2D(tVideo, videoUv).rgb;
@@ -278,8 +274,6 @@ const morphShader = {
             finalColor = mix(finalColor, mix(finalColor, videoColor, 0.92), videoMask);
 
             float energy = clamp(uAudioLow * 0.5 + uAudioMid * 0.9 + uAudioHigh * 0.7 + uNotePulse, 0.0, 2.0);
-            float shock = smoothstep(0.28, 0.82, distance(vUv, vec2(0.5)));
-            finalColor *= 1.0 + shock * (uNotePulse * 0.2 + uAudioLow * 0.07);
             finalColor = mix(finalColor, finalColor * (0.96 + 0.04 * sin(time * 180.0 + vUv.y * 26.0)), clamp(uAudioMid * 0.22, 0.0, 0.2));
             finalColor *= 0.98 + 0.02 * smoothstep(0.0, 1.4, energy);
 
@@ -290,7 +284,10 @@ const morphShader = {
 
 const SPHERE = new THREE.Mesh(
     new THREE.SphereGeometry(1, 200, 200),
-    new THREE.ShaderMaterial(morphShader)
+    new THREE.ShaderMaterial({
+        ...morphShader,
+        side: THREE.DoubleSide
+    })
 );
 
 SPHERE.scale.set(1.3, 1.3, 1.3);
@@ -324,7 +321,6 @@ const focusSphereScale = 1.72;
 
 const projectPoints = new THREE.Group();
 SCENE.add(projectPoints);
-let bioSpacePlane = null;
 
 // Store projects data globally to be set from Svelte
 let allProjects = [];
@@ -654,9 +650,9 @@ const createDestructiblePoint = (project, position) => {
     const particleSystem = new THREE.Points(particles, particleMaterial);
     pointGroup.add(particleSystem);
     
-    // Add interaction sphere for raycasting
+    // Add interaction sphere for raycasting (larger than the visible particles for easier mouse targeting)
     const interactionSphere = new THREE.Mesh(
-        new THREE.SphereGeometry(0.09, 8, 8), // był 0.05
+        new THREE.SphereGeometry(0.12, 8, 8),
         new THREE.MeshBasicMaterial({ visible: false })
     );
     pointGroup.add(interactionSphere);
@@ -685,6 +681,7 @@ const createDestructiblePoint = (project, position) => {
 // Variables for morphing logic
 let currentTextureIndex = 0;
 let morphing = false;
+const enableTextureMorph = false;
 let baseMorphSpeed = 0.000091;
 let morphSpeed = baseMorphSpeed;
 const morphDelay = 2000;
@@ -702,6 +699,7 @@ let projectedVideoEl = null;
 let projectedVideoTexture = null;
 let notePulse = 0;
 let audioEnergy = 0;
+let rotationAudioResponse = 0;
 let noteTriggerRegistered = false;
 let animationStarted = false;
 let animationFrameId = null;
@@ -774,6 +772,12 @@ const animate = async () => {
         uniforms.uNotePulse.value = lerp(uniforms.uNotePulse.value, notePulse, 0.12);
         audioEnergy = lerp(audioEnergy, clamp(low * 0.45 + mid * 0.75 + high * 0.55 + notePulse * 0.42, 0, 1.4), 0.11);
         uniforms.uEnergy.value = audioEnergy;
+        const rawRotationResponse = clamp(
+            low * 0.14 + mid * 0.34 + high * 0.16 + uniforms.uNotePulse.value * 0.22,
+            0,
+            1
+        );
+        rotationAudioResponse = lerp(rotationAudioResponse, rawRotationResponse, 0.045);
 
         notePulse *= 0.88;
         directionalLight.intensity = lerp(
@@ -791,9 +795,11 @@ const animate = async () => {
     } else {
         uniforms.uNotePulse.value = lerp(uniforms.uNotePulse.value, 0, 0.06);
         uniforms.uEnergy.value = lerp(uniforms.uEnergy.value, 0, 0.06);
+        rotationAudioResponse = lerp(rotationAudioResponse, 0, 0.04);
     }
 
-    const targetCameraZ = 2.2 - bioFocusCurrent * 0.9;
+    // Keep the camera outside the sphere during bio focus to avoid front-face culling blackouts.
+    const targetCameraZ = 2.2 - bioFocusCurrent * 0.45;
     CAMERA.position.z += (targetCameraZ - CAMERA.position.z) * 0.08;
     const nextFov = baseCameraFov - (baseCameraFov - focusCameraFov) * bioFocusCurrent;
     if (Math.abs(CAMERA.fov - nextFov) > 0.001) {
@@ -819,59 +825,66 @@ const animate = async () => {
     SPHERE.scale.set(clampedSphereScale, clampedSphereScale, clampedSphereScale);
 
     // Handle morphing with scroll-based speed
-    if (!morphing && now - lastMorphTime > morphDelay) {
-        morphing = true;
-        uniforms.tDiffuse1.value = texture[currentTextureIndex];
-        currentTextureIndex = (currentTextureIndex + 1) % texture.length;
-        uniforms.tDiffuse2.value = texture[currentTextureIndex];
-        uniforms.morphFactor.value = 0.5;
-        lastMorphTime = now;
-        // Play morph sound once per morph cycle
-        if (now - lastMorphSoundTime > morphDelay) {
-            audioSystem.playMorphSound(uniforms.morphFactor.value);
-            lastMorphSoundTime = now;
+    if (enableTextureMorph) {
+        if (!morphing && now - lastMorphTime > morphDelay) {
+            morphing = true;
+            uniforms.tDiffuse1.value = texture[currentTextureIndex];
+            currentTextureIndex = (currentTextureIndex + 1) % texture.length;
+            uniforms.tDiffuse2.value = texture[currentTextureIndex];
+            uniforms.morphFactor.value = 0.5;
+            lastMorphTime = now;
+            // Play morph sound once per morph cycle
+            if (now - lastMorphSoundTime > morphDelay) {
+                audioSystem.playMorphSound(uniforms.morphFactor.value);
+                lastMorphSoundTime = now;
+            }
+        }
+
+        if (morphing) {
+            uniforms.morphFactor.value += morphSpeed;
+            if (uniforms.morphFactor.value >= 1.0) {
+                uniforms.morphFactor.value = 1.0;
+                morphing = false;
+            }
         }
     }
 
-    if (morphing) {
-        uniforms.morphFactor.value += morphSpeed;
-        if (uniforms.morphFactor.value >= 1.0) {
-            uniforms.morphFactor.value = 1.0;
-            morphing = false;
-        }
-    }
-
-    // Apply drag-based rotation with smooth interpolation
+    // Keep manual rotation free-flowing after drag release.
     if (!isDragging) {
-        sphereRotation.x += (targetRotation.x - sphereRotation.x) * dampingFactor;
-        sphereRotation.y += (targetRotation.y - sphereRotation.y) * dampingFactor;
+        sphereRotation.x += rotationVelocity.x;
+        sphereRotation.y += rotationVelocity.y;
+        sphereRotation.x = clamp(sphereRotation.x, -maxDragTilt, maxDragTilt);
+        rotationVelocity.x *= rotationFriction;
+        rotationVelocity.y *= rotationFriction;
+        if (sphereRotation.x <= -maxDragTilt || sphereRotation.x >= maxDragTilt) {
+            rotationVelocity.x = 0;
+        }
+        if (Math.abs(rotationVelocity.x) < 0.00001) rotationVelocity.x = 0;
+        if (Math.abs(rotationVelocity.y) < 0.00001) rotationVelocity.y = 0;
     }
 
-    // Apply rotation to sphere and project points
-    const energySpin = 1 + uniforms.uAudioMid.value * 0.45 + uniforms.uAudioHigh.value * 0.2 + scrollNorm * 0.33;
-    const autoRotationX = now * 0.00014 * energySpin;
-    const autoRotationY = now * 0.00014 * (1 + uniforms.uAudioLow.value * 0.3 + scrollNorm * 0.26);
+    // Apply rotation to the main sphere
+    const energySpin = 1 + rotationAudioResponse * 0.32 + scrollNorm * 0.2;
+    const autoRotationX = now * 0.0001 * energySpin;
+    const autoRotationY = now * 0.0001 * (1 + rotationAudioResponse * 0.24 + scrollNorm * 0.16);
     
     SPHERE.rotation.x = sphereRotation.x + autoRotationX;
     SPHERE.rotation.y = sphereRotation.y + autoRotationY;
-    projectPoints.rotation.x = sphereRotation.x + autoRotationX;
-    projectPoints.rotation.y = sphereRotation.y + autoRotationY;
 
-    if (bioSpacePlane) {
-        bioSpacePlane.material.opacity = bioFocusCurrent * 0.9;
-        bioSpacePlane.rotation.z += 0.0004 + bioFocusCurrent * 0.0008;
-        bioSpacePlane.material.map.offset.x += 0.0001 + bioFocusCurrent * 0.0005;
-        bioSpacePlane.material.map.offset.y -= 0.00005 + bioFocusCurrent * 0.0002;
-        bioSpacePlane.position.z = -1.8 - bioFocusCurrent * 0.9;
-    }
+    // Keep project bubbles independent from the main sphere rotation.
+    const bubbleAutoRotationX = now * 0.00008 * (1 + uniforms.uAudioLow.value * 0.22);
+    const bubbleAutoRotationY = now * 0.00012 * (1 + uniforms.uAudioMid.value * 0.2);
+    projectPoints.rotation.x = bubbleAutoRotationX;
+    projectPoints.rotation.y = bubbleAutoRotationY;
 
     z = scrollPosition/60+2;
     m = scrollPosition/5929+0.01;
     n = z-2;
      
-    const projectPointsVisible = bioFocusCurrent < 0.92;
+    const projectPointsVisible = true;
     projectPoints.visible = projectPointsVisible;
-    projectPoints.scale.setScalar(1 - bioFocusCurrent * 0.3);
+    // Keep points flying and near the sphere surface even in bio focus mode.
+    projectPoints.scale.setScalar(1 - bioFocusCurrent * 0.05);
     const scrollSwayX = Math.sin(scrollPosition * 0.002 + now * 0.0003) * 0.035 * scrollNorm;
     const scrollSwayY = Math.cos(scrollPosition * 0.0017 + now * 0.0004) * 0.05 * scrollNorm;
     CAMERA.position.x = lerp(CAMERA.position.x, Math.sin(now * 0.0016) * uniforms.uAudioHigh.value * 0.03 + scrollSwayX, 0.04);
@@ -909,9 +922,17 @@ const animate = async () => {
             }
             material.uniforms.hoverFactor.value = userData.hoverFactor;
             
-            // Click destruction
-            if (userData.isClicked && userData.destructionFactor < 3.0) {
-                userData.destructionFactor += 0.1;
+            // Click burst: explode briefly, then respawn so bubbles are always reusable.
+            if (userData.isClicked) {
+                if (userData.destructionFactor < 1.5) {
+                    userData.destructionFactor += 0.12;
+                } else {
+                    userData.isClicked = false;
+                    userData.destructionFactor = 0;
+                    userData.hoverFactor = 0;
+                    userData.isHovered = false;
+                    userData.movementOffset = Math.random() * 2 * Math.PI;
+                }
             }
             
             material.uniforms.destructionFactor.value = userData.destructionFactor;
@@ -948,6 +969,8 @@ const onMouseDown = (event) => {
     isDragging = true;
     hasMovedWhileDragging = false;
     dragStartTime = performance.now();
+    rotationVelocity.x *= 0.25;
+    rotationVelocity.y *= 0.25;
     previousMousePosition = {
         x: event.clientX,
         y: event.clientY
@@ -981,11 +1004,13 @@ const onMouseMove = (event) => {
                 audioSystem.playDragSound();
             }
             
-            // Update rotation
-            targetRotation.y += deltaMove.x * rotationSpeed;
-            targetRotation.x -= deltaMove.y * rotationSpeed;
-            sphereRotation.y = targetRotation.y;
-            sphereRotation.x = targetRotation.x;
+            // Update rotation directly and store velocity for release inertia.
+            const rotationDeltaY = deltaMove.x * rotationSpeed;
+            const rotationDeltaX = -deltaMove.y * rotationSpeed;
+            sphereRotation.y += rotationDeltaY;
+            sphereRotation.x = clamp(sphereRotation.x + rotationDeltaX, -maxDragTilt, maxDragTilt);
+            rotationVelocity.y = rotationVelocity.y * (1 - dragVelocityBlend) + rotationDeltaY * dragVelocityBlend;
+            rotationVelocity.x = rotationVelocity.x * (1 - dragVelocityBlend) + rotationDeltaX * dragVelocityBlend;
 
             previousMousePosition = {
                 x: event.clientX,
@@ -1072,10 +1097,11 @@ const handleProjectClick = (event) => {
         
         
         
-        // Mark as clicked and start permanent destruction
+        // Mark as clicked and start temporary destruction burst.
         if (!clickedGroup.userData.isClicked) {
             clickedGroup.userData.isClicked = true;
             clickedGroup.userData.isHovered = false;
+            clickedGroup.userData.destructionFactor = 0;
         }
         
         // Scroll to the project section
@@ -1144,17 +1170,6 @@ export const setScene = async (canvas) => {
     if (!aboutTextTexture) {
         aboutTextTexture = createAboutTextTexture();
         SPHERE.material.uniforms.tAboutText.value = aboutTextTexture;
-        const planeMaterial = new THREE.MeshBasicMaterial({
-            map: aboutTextTexture,
-            transparent: true,
-            opacity: 0,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false
-        });
-        planeMaterial.map.repeat.set(1.5, 1.9);
-        bioSpacePlane = new THREE.Mesh(new THREE.PlaneGeometry(12, 7.5), planeMaterial);
-        bioSpacePlane.position.set(0, 0, -1.8);
-        SCENE.add(bioSpacePlane);
     }
     SPHERE.material.uniforms.aboutTextIntensity.value = aboutProjectionCurrent;
     

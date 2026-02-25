@@ -1,13 +1,18 @@
 import { client } from '$lib/sanity/client';
 import localData from '../../data.json';
+import { normalizePortfolioProjects } from '$lib/utils/projects.js';
 
 export const prerender = true;
 
 export const load = async () => {
     if (client.config().projectId === 'YOUR_PROJECT_ID') {
         console.warn('⚠️ Sanity Project ID not set. Using local fallback data.');
+        const normalized = normalizePortfolioProjects(localData);
         return {
-            portfolioData: localData
+            portfolioData: {
+                ...localData,
+                ...normalized
+            }
         };
     }
 
@@ -19,14 +24,22 @@ export const load = async () => {
     try {
         const now = new Date().toISOString();
         const data = await client.fetch(query, { now });
+        const normalized = normalizePortfolioProjects(data);
         return {
-            portfolioData: data
+            portfolioData: {
+                ...data,
+                ...normalized
+            }
         };
     } catch (error) {
         console.error('Failed to fetch data from Sanity:', error);
         console.warn('Falling back to local data.');
+        const normalized = normalizePortfolioProjects(localData);
         return {
-            portfolioData: localData
+            portfolioData: {
+                ...localData,
+                ...normalized
+            }
         };
     }
 };

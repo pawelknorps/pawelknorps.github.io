@@ -2,6 +2,7 @@
 	import { createEventDispatcher } from 'svelte';
 	import { fade } from "svelte/transition";
 	import { resolveProjectMedia } from '$lib/utils/projectMedia.js';
+	import SandboxedEmbed from '$lib/components/SandboxedEmbed.svelte';
 	
 	export let musicProjects;
 	export let programmingProjects;
@@ -55,10 +56,10 @@
 <!-- Music Projects -->
 {#if musicProjects.length > 0}
 	<div
-		class="project-group mb-32 w-full xl:flex xl:flex-col xl:items-start xl:w-[48rem] 2xl:w-[56rem]"
+		class="project-group mb-32 w-full xl:flex xl:flex-col xl:items-start xl:max-w-[56rem] 2xl:max-w-[64rem]"
 	>
 		<h3
-			class="text-3xl font-black tracking-widest mb-16 opacity-80 adaptive-text w-full xl:w-[48rem] 2xl:w-[56rem]"
+			class="text-3xl font-black tracking-widest mb-16 opacity-80 adaptive-text w-full xl:max-w-[56rem] 2xl:max-w-[64rem]"
 			class:text-white={adaptiveTextClass === "text-white"}
 			class:text-gray-900={adaptiveTextClass === "text-gray-900"}
 		>
@@ -105,7 +106,7 @@
 
 			<div
 				id="music-{i}"
-				class="group my-20 translate-y-0 hover:-translate-y-8 duration-[400ms] ease-in-out w-full md:w-[40rem] lg:w-[30rem] xl:w-[48rem] 2xl:w-[56rem] project-card pointer-events-auto"
+				class="group my-20 translate-y-0 hover:-translate-y-8 duration-[400ms] ease-in-out w-full md:max-w-[40rem] lg:max-w-[48rem] xl:max-w-[56rem] 2xl:max-w-[64rem] project-card pointer-events-auto"
 				in:fade={{ delay: 250 * i, duration: 1000 }}
 			>
 				{#if youtubeId}
@@ -134,17 +135,12 @@
 								handleEnterViewport(`youtube-${i}`)}
 						>
 							{#if loadedVideos[`youtube-${i}`]}
-								<iframe
-									width="100%"
-									height="100%"
+								<SandboxedEmbed
 									src="https://www.youtube.com/embed/{youtubeId}"
 									title={data.title}
-									frameborder="0"
-									allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-									allowfullscreen
-									loading="lazy"
-									class="absolute top-0 left-0 w-full h-full"
-								></iframe>
+									allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+									className="absolute top-0 left-0 w-full h-full"
+								/>
 							{/if}
 						</div>
 
@@ -170,7 +166,6 @@
 								{/each}
 							{/if}
 						</div>
-
 						<!-- External Links -->
 						<div class="flex flex-wrap gap-4 mt-4">
 							{#if data.links}
@@ -227,26 +222,20 @@
 									handleEnterViewport(`facebook-${i}`)}
 							>
 								{#if loadedVideos[`facebook-${i}`]}
-									<iframe
+									<SandboxedEmbed
 										src="https://www.facebook.com/plugins/video.php?href={encodeURIComponent(
 											facebookUrl,
 										)}&show_text=false&t=0"
 										title={`${data.title} Facebook video`}
-										width="100%"
-										height="100%"
+										allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share; fullscreen"
 										style="border:none;overflow:hidden;"
-										scrolling="no"
-										frameborder="0"
-										allowfullscreen="true"
-										loading="lazy"
-										allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
-										class="absolute left-0 w-full {aspectRatio ===
+										className="absolute left-0 w-full {aspectRatio ===
 										'9:16'
 											? 'h-[320%] top-1/2 -translate-y-1/2'
 											: aspectRatio === '1:1'
 												? 'h-[178%] top-1/2 -translate-y-1/2'
 												: 'h-full top-0'}"
-									></iframe>
+									/>
 								{/if}
 							</div>
 						</div>
@@ -273,7 +262,6 @@
 								{/each}
 							{/if}
 						</div>
-
 						<div class="flex flex-wrap gap-4 mt-4">
 							{#if data.links}
 								{#each Object.entries(data.links) as [platform, url]}
@@ -322,18 +310,14 @@
 								handleEnterViewport(`soundcloud-${i}`)}
 						>
 							{#if loadedVideos[`soundcloud-${i}`]}
-								<iframe
-									width="100%"
+								<SandboxedEmbed
 									height="166"
 									title={`${data.title} SoundCloud player`}
-									scrolling="no"
-									frameborder="no"
 									allow="autoplay"
-									loading="lazy"
 									src="https://w.soundcloud.com/player/?url={encodeURIComponent(
 										soundcloudUrl,
 									)}&color=%23ff0080&auto_play=false&hide_related=false&show_comments=true&show_user=true&show_reposts=false&show_teaser=true"
-								></iframe>
+								/>
 							{/if}
 						</div>
 
@@ -359,7 +343,6 @@
 								{/each}
 							{/if}
 						</div>
-
 						<div class="flex flex-wrap gap-4 mt-4">
 							{#if data.links}
 								{#each Object.entries(data.links) as [platform, url]}
@@ -384,19 +367,7 @@
 						</div>
 					</div>
 				{:else if data.links}
-					<a
-						href={data.links.youtube ||
-							data.links.bandcamp ||
-							data.links.soundcloud ||
-							data.links.facebook ||
-							data.links.instagram ||
-							data.links.website ||
-							data.links.maps}
-						rel="noopener noreferrer"
-						target="_blank"
-						on:click={(event) => openInApp(event, data, 'music')}
-						class="block h-auto px-0 py-0 tracking-widest transition-all duration-300 transform hover:scale-[1.02] cursor-pointer"
-					>
+					<div class="block h-auto px-0 py-0 tracking-widest transition-all duration-300 transform hover:scale-[1.02]">
 						<h2
 							class="text-xl font-black mb-4 hover:text-[#FF0080] transition-colors duration-300 adaptive-text"
 							class:text-white={adaptiveTextClass ===
@@ -430,7 +401,26 @@
 								{/each}
 							{/if}
 						</div>
-					</a>
+						<div class="mt-4">
+							<div class="flex flex-wrap gap-4">
+								<a
+									href={data.links.youtube ||
+										data.links.bandcamp ||
+										data.links.soundcloud ||
+										data.links.facebook ||
+										data.links.instagram ||
+										data.links.website ||
+										data.links.maps}
+									rel="noopener noreferrer"
+									target="_blank"
+									on:click={(event) => openInApp(event, data, 'music')}
+									class="inline-flex text-xs uppercase tracking-widest hover:text-[#FF0080] transition-colors duration-300 adaptive-subtext border-b border-transparent hover:border-[#FF0080]"
+								>
+									Open project ↗
+								</a>
+							</div>
+						</div>
+					</div>
 				{:else}
 					<div class="h-auto px-0 py-0 tracking-widest">
 						<h2
@@ -476,10 +466,10 @@
 <!-- Programming Projects -->
 {#if programmingProjects.length > 0}
 	<div
-		class="project-group mb-32 w-full xl:flex xl:flex-col xl:items-start xl:w-[48rem] 2xl:w-[56rem]"
+		class="project-group mb-32 w-full xl:flex xl:flex-col xl:items-start xl:max-w-[56rem] 2xl:max-w-[64rem]"
 	>
 		<h3
-			class="text-3xl font-black tracking-widest mb-16 opacity-80 adaptive-text w-full xl:w-[48rem] 2xl:w-[56rem]"
+			class="text-3xl font-black tracking-widest mb-16 opacity-80 adaptive-text w-full xl:max-w-[56rem] 2xl:max-w-[64rem]"
 			class:text-white={adaptiveTextClass === "text-white"}
 			class:text-gray-900={adaptiveTextClass === "text-gray-900"}
 		>
@@ -488,18 +478,26 @@
 		{#each programmingProjects as data, i}
 			<div
 				id="programming-{i}"
-				class="group my-20 translate-y-0 hover:-translate-y-8 duration-[400ms] ease-in-out w-full md:w-[40rem] lg:w-[30rem] xl:w-[48rem] 2xl:w-[56rem] project-card pointer-events-auto"
+				class="group my-20 translate-y-0 hover:-translate-y-8 duration-[400ms] ease-in-out w-full md:max-w-[40rem] lg:max-w-[48rem] xl:max-w-[56rem] 2xl:max-w-[64rem] project-card pointer-events-auto"
 				in:fade={{
 					delay: 250 * (i + musicProjects.length),
 					duration: 1000,
 				}}
 			>
 				{#if data.github || data.demo}
-					<a href={data.github || data.demo} rel="noopener noreferrer" target="_blank" on:click={(event) => openInApp(event, data, 'programming')} class="block h-auto px-0 py-0 tracking-widest transition-all duration-300 transform hover:scale-[1.02] cursor-pointer">
+					<div class="block h-auto px-0 py-0 tracking-widest transition-all duration-300 transform hover:scale-[1.02]">
 						<h2 class="text-xl font-black mb-4 hover:text-[#FF0080] transition-colors duration-300 adaptive-text"
 							class:text-white={adaptiveTextClass === 'text-white'}
 							class:text-gray-900={adaptiveTextClass === 'text-gray-900'}>
 							<mark style="background: none;" class="text-[#FF0080]">.</mark>&nbsp;{data.title}
+						</h2>
+						<h2
+							class="text-md font-base mb-4 leading-relaxed adaptive-subtext"
+							class:text-gray-300={adaptiveSubTextClass === 'text-gray-300'}
+							class:text-gray-200={adaptiveSubTextClass === 'text-gray-200'}
+							class:text-gray-700={adaptiveSubTextClass === 'text-gray-700'}
+						>
+							{data.description}
 						</h2>
 						<div class="flex flex-wrap gap-3">
 							{#if data.technologies}
@@ -511,7 +509,10 @@
 								{/each}
 							{/if}
 						</div>
-					</a>
+						<div class="mt-4 flex flex-wrap gap-4">
+							<a href={data.github || data.demo} rel="noopener noreferrer" target="_blank" on:click={(event) => openInApp(event, data, 'programming')} class="inline-flex text-xs uppercase tracking-widest hover:text-[#FF0080] transition-colors duration-300 adaptive-subtext border-b border-transparent hover:border-[#FF0080]">Open project ↗</a>
+						</div>
+					</div>
 				{:else}
 					<div class="h-auto px-0 py-0 tracking-widest">
 						<h2

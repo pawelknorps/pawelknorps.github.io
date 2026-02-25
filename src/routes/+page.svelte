@@ -1,35 +1,37 @@
 <svelte:head>
-    <title>Paweł Knorps - Composer Guitarist Portfolio</title>
-    <meta name="description" content="Portfolio of Paweł Knorps, a composer, guitarist, basist, producer." />
-    <link rel="canonical" href="https://pawelknorps.github.io/" />
+    <title>{SITE_TITLE}</title>
+    <meta name="description" content={SITE_DESCRIPTION} />
+    <link rel="canonical" href={SITE_URL + '/'} />
 
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://pawelknorps.github.io/" />
-    <meta property="og:title" content="Paweł Knorps - Composer Guitarist Portfolio" />
-    <meta property="og:description" content="Portfolio of Paweł Knorps, a composer, guitarist, basist, producer." />
-    <meta property="og:image" content="https://pawelknorps.github.io/og-image.png" />
+    <meta property="og:url" content={SITE_URL + '/'} />
+    <meta property="og:title" content={SITE_TITLE} />
+    <meta property="og:description" content={SITE_DESCRIPTION} />
+    <meta property="og:image" content={SITE_OG_IMAGE} />
+    <meta property="og:site_name" content={SITE_NAME} />
 
     <meta property="twitter:card" content="summary_large_image" />
-    <meta property="twitter:url" content="https://pawelknorps.github.io/" />
-    <meta property="twitter:title" content="Paweł Knorps - Composer Guitarist Portfolio" />
-    <meta property="twitter:description" content="Portfolio of Paweł Knorps, a composer, guitarist, basist, producer." />
-    <meta property="twitter:image" content="https://pawelknorps.github.io/og-image.png" />
+    <meta property="twitter:url" content={SITE_URL + '/'} />
+    <meta property="twitter:title" content={SITE_TITLE} />
+    <meta property="twitter:description" content={SITE_DESCRIPTION} />
+    <meta property="twitter:image" content={SITE_OG_IMAGE} />
+    <script type="application/ld+json">{personJsonLd}</script>
+    <script type="application/ld+json">{projectsJsonLd}</script>
 </svelte:head>
 <script>
-	// Library Imports
-	import { setScene, updateProjects, setBioProjectionEnabled, setProjectOpenHandler, setProjectedVideo, clearProjectedVideo, destroyScene } from '$lib/ThreeObject.js';
 	import { onMount, onDestroy, tick } from 'svelte';
+	import { env as publicEnv } from '$env/dynamic/public';
 	
 	// Import components
 	import HeroSection from '$lib/components/HeroSection.svelte';
 	import SocialBubbles from '$lib/components/SocialBubbles.svelte';
-	import AudioControls from '$lib/components/AudioControls.svelte';
 	import ProjectsSection from '$lib/components/ProjectsSection.svelte';
 	import BiographicalSection from '$lib/components/BiographicalSection.svelte';
 	import ProjectMediaOverlay from '$lib/components/ProjectMediaOverlay.svelte';
-	import ContactPortal from '$lib/components/ContactPortal.svelte';
 	import { resolveProjectMedia } from '$lib/utils/projectMedia.js';
 	import { audioSystem } from '$lib/AudioSystem.js';
+	import { SITE_DESCRIPTION, SITE_NAME, SITE_OG_IMAGE, SITE_TITLE, SITE_URL } from '$lib/config/site.js';
+	const PUBLIC_TURNSTILE_SITE_KEY = publicEnv.PUBLIC_TURNSTILE_SITE_KEY || '';
 	
 
 	// 🚀 Ta zmienna przychodzi z load()
@@ -40,6 +42,18 @@
 	let ThreeObject;
 	let sceneInitialized = false;
 	let sceneReady = false; // New state to track if the scene is loaded
+	let immersiveApi = null;
+	const noOp = () => {};
+	const getImmersiveApi = () =>
+		immersiveApi || {
+			setScene: async () => {},
+			updateProjects: noOp,
+			setBioProjectionEnabled: noOp,
+			setProjectOpenHandler: noOp,
+			setProjectedVideo: noOp,
+			clearProjectedVideo: noOp,
+			destroyScene: noOp
+		};
 	// Project data
 	let personalData = {};
 	let musicProjects = [];
@@ -59,10 +73,12 @@
 	let activeMedia = null;
 	let speechVoices = [];
 	let selectedNarrationVoice = null;
+	let reducedMotion = false;
+	let AudioControlsComponent = null;
 	let contactFocusEnabled = false;
 	let contactStatus = 'idle';
 	let contactError = '';
-	$: showBio = innerWidth >= 1300;
+	let turnstileToken = '';
 	$: projectsHeight = 0;
 
 	const BIO_NARRATION_TEXT = `Paweł Knorps to artysta poruszający się między tradycją a eksploracją, oddany dźwiękowi jako sile przekraczającej granice. Absolwent gitary jazzowej poznańskiej Akademii Muzycznej oraz kompozycji jazzowej na Danish National Academy of Music w Odense. 
@@ -71,10 +87,63 @@
 	Jego alter ego, enthymeme, to świat elektronicznej improwizacji, w którym technologia spotyka się z ludzkim dotykiem.
 	Dziś po powrocie z Danii zasila wiele poznańskich projektów, od Milomi i SNY, przez Przesilenie i GānāVānā, po Aktas Erdogan Trio.
 	Każda z tych formacji jest przejawem niezaspokojonej ciekawości w poszukiwaniu własnej ekspresji.`;
+	$: personJsonLd = JSON.stringify({
+		'@context': 'https://schema.org',
+		'@type': 'Person',
+		name: personalData?.name || SITE_NAME,
+		url: SITE_URL,
+		jobTitle: personalData?.title || 'Composer, Guitarist, Producer',
+		description: SITE_DESCRIPTION,
+		sameAs: [
+			personalData?.links?.instagram,
+			personalData?.links?.youtube,
+			personalData?.links?.facebook
+		].filter(Boolean)
+	});
+	$: projectsJsonLd = JSON.stringify({
+		'@context': 'https://schema.org',
+		'@type': 'ItemList',
+		name: `${SITE_NAME} projects`,
+		itemListElement: [...musicProjects, ...programmingProjects].map((project, index) => ({
+			'@type': 'ListItem',
+			position: index + 1,
+			url: `${SITE_URL}${project.href || ''}`,
+			name: project.title
+		}))
+	});
+
+	const ensureImmersiveApi = async () => {
+		if (immersiveApi) return immersiveApi;
+		const module = await import('$lib/ThreeObject.js');
+		immersiveApi = {
+			setScene: module.setScene,
+			updateProjects: module.updateProjects,
+			setBioProjectionEnabled: module.setBioProjectionEnabled,
+			setProjectOpenHandler: module.setProjectOpenHandler,
+			setProjectedVideo: module.setProjectedVideo,
+			clearProjectedVideo: module.clearProjectedVideo,
+			destroyScene: module.destroyScene
+		};
+		return immersiveApi;
+	};
+
+	const withAutoplay = (embedSrc, enabled) => {
+		if (!embedSrc) return embedSrc;
+		try {
+			const parsed = new URL(embedSrc);
+			parsed.searchParams.set('autoplay', enabled ? '1' : '0');
+			return parsed.toString();
+		} catch {
+			return embedSrc;
+		}
+	};
 
 	const syncSceneFocus = () => {
-		setBioProjectionEnabled(bioFocusEnabled || contactFocusEnabled || !!activeMedia);
+		getImmersiveApi().setBioProjectionEnabled(bioFocusEnabled || contactFocusEnabled || !!activeMedia);
 	};
+	$: if (sceneInitialized) {
+		syncSceneFocus();
+	}
 
 	const openProjectMedia = (project) => {
 		const media = resolveProjectMedia(project);
@@ -84,7 +153,7 @@
 		// Real sphere projection requires direct video files (mp4/webm/ogg).
 		// YouTube URLs can only be shown in iframe fallback unless pipeline provides projectionVideo.
 		if (media.projectionVideo) {
-			setProjectedVideo(media.projectionVideo);
+			getImmersiveApi().setProjectedVideo(media.projectionVideo);
 			activeMedia = null;
 			syncSceneFocus();
 			return true;
@@ -95,7 +164,7 @@
 			subtitle: project.type || project.year || media.provider || 'media',
 			url,
 			kind: media.kind,
-			embedSrc: media.embedSrc,
+			embedSrc: withAutoplay(media.embedSrc, !reducedMotion),
 			allow: media.allow
 		};
 		syncSceneFocus();
@@ -104,8 +173,18 @@
 
 	const closeProjectMedia = () => {
 		activeMedia = null;
-		clearProjectedVideo();
+		getImmersiveApi().clearProjectedVideo();
 		syncSceneFocus();
+	};
+
+	const preloadAudioControls = async () => {
+		if (AudioControlsComponent) return;
+		try {
+			const module = await import('$lib/components/AudioControls.svelte');
+			AudioControlsComponent = module.default;
+		} catch (error) {
+			console.warn('Failed to load audio controls:', error);
+		}
 	};
 
 	const setupNarrationVoice = () => {
@@ -126,6 +205,7 @@
 
 	const startBioNarration = async () => {
 		if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+		if (reducedMotion) return;
 		if (!audioSystem.isInitialized) {
 			await audioSystem.init();
 		}
@@ -224,15 +304,18 @@
 			ThreeObject.height = window.innerHeight;
 			
 				// Initialize the scene
-				await setScene(ThreeObject);
-				sceneInitialized = true;
-				sceneReady = true;
+				await ensureImmersiveApi();
+				await getImmersiveApi().setScene(ThreeObject);
+					getImmersiveApi().setProjectOpenHandler((project) => openProjectMedia(project));
+					sceneInitialized = true;
+					sceneReady = true;
+					syncSceneFocus();
 				
 				console.log('Scene initialized successfully');
 			
 			// Update projects if data is available
 			if (musicProjects.length > 0 || programmingProjects.length > 0) {
-				updateProjects(musicProjects, programmingProjects);
+				getImmersiveApi().updateProjects(musicProjects, programmingProjects);
 				console.log('Projects updated');
 			}
 			
@@ -241,9 +324,17 @@
 
 			function startBrightnessSampling() {
 				function sampleLoop() {
-					// Only sample every 10 frames to save CPU
-					if (frameCount % 10 === 0) {
+					// Keep readbacks from the WebGL canvas infrequent to reduce main-thread work.
+					const sampleEvery = reducedMotion ? 90 : 45;
+					if (frameCount % sampleEvery === 0) {
 						sampleCanvasBrightness();
+					}
+					if (isAudioEnabled) {
+						const { low = 0, mid = 0, high = 0 } = audioSystem.getAnalysis?.() || {};
+						const targetIntensity = clamp01(low * 0.5 + mid * 0.35 + high * 0.15);
+						audioIntensity += (targetIntensity - audioIntensity) * 0.12;
+					} else {
+						audioIntensity += (0 - audioIntensity) * 0.08;
 					}
 					frameCount++;
 					brightnessInterval = requestAnimationFrame(sampleLoop);
@@ -269,11 +360,27 @@
 
 	// Audio state tracking
 	let isAudioEnabled = false;
+	let audioIntensity = 0;
 
 	// Sample brightness periodically
 	let brightnessInterval;
+	const clamp01 = (value) => Math.min(1, Math.max(0, value));
 	
+	const bootstrapAudio = async () => {
+		if (audioSystem.isInitialized) {
+			isAudioEnabled = true;
+			return;
+		}
+		try {
+			await audioSystem.init();
+			isAudioEnabled = true;
+		} catch (error) {
+			console.warn('Audio bootstrap failed:', error);
+		}
+	};
+
 	onMount(async () => {
+		reducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 		// Wait for DOM to be ready
 		await tick();
 		
@@ -292,16 +399,20 @@
 			console.error('Brak danych portfolio');
 		}
 		
-		// Wait a bit more for canvas to be available
-		setTimeout(async () => {
+		// Delay heavy 3D startup and prefer idle time.
+		const scheduleInit = window.requestIdleCallback || ((cb) => setTimeout(cb, 1200));
+		scheduleInit(async () => {
 			if (ThreeObject) {
 				await initializeScene();
 			} else {
 				console.error('Canvas element not available');
 			}
-		}, 100);
+		});
+		const scheduleControls = window.requestIdleCallback || ((cb) => setTimeout(cb, 2200));
+		scheduleControls(() => {
+			void preloadAudioControls();
+		});
 
-		setProjectOpenHandler((project) => openProjectMedia(project));
 		setupNarrationVoice();
 		if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
 			window.speechSynthesis.onvoiceschanged = setupNarrationVoice;
@@ -313,6 +424,9 @@
 					cancelAnimationFrame(brightnessInterval);
 				}
 				stopBioNarration();
+				if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+					window.speechSynthesis.onvoiceschanged = null;
+				}
 			};
     });
 
@@ -322,35 +436,31 @@
 			brightnessInterval = null;
 		}
 		stopBioNarration();
-		destroyScene();
+		getImmersiveApi().destroyScene();
 	});
 		
 	// Add a manual initialization trigger for debugging
-	const handleCanvasClick = () => {
+	const handleCanvasClick = async () => {
 		if (!sceneInitialized) {
 			console.log('Manual scene initialization triggered');
-			initializeScene();
+			await initializeScene();
 		}
-		// Audio will be initialized automatically in ThreeObject.js onMouseDown
-		isAudioEnabled = true;
+		void preloadAudioControls();
+		await bootstrapAudio();
 	};
 
 	const handleToggleBioFocus = () => {
 		bioFocusEnabled = !bioFocusEnabled;
+		getImmersiveApi().clearProjectedVideo();
 		if (bioFocusEnabled) {
+			activeMedia = null;
 			void startBioNarration();
 		} else {
 			stopBioNarration();
 		}
 		if (!bioFocusEnabled) {
-			clearProjectedVideo();
 			activeMedia = null;
 		}
-		syncSceneFocus();
-	};
-
-	const handleToggleBioProjection = () => {
-		bioFocusEnabled = !bioFocusEnabled;
 		syncSceneFocus();
 	};
 
@@ -360,7 +470,7 @@
 	};
 
 	const handleContactSubmit = async (event) => {
-		const { name, email, message } = event.detail || {};
+		const { name, email, message, website, startedAt } = event.detail || {};
 		contactStatus = 'submitting';
 		contactError = '';
 		contactFocusEnabled = true;
@@ -373,6 +483,9 @@
 					name,
 					email,
 					message,
+					website,
+					startedAt,
+					turnstileToken,
 					source: 'knorps.com artistic contact portal'
 				})
 			});
@@ -381,6 +494,7 @@
 				throw new Error(result?.error || 'Failed to send message');
 			}
 			contactStatus = 'success';
+			turnstileToken = '';
 			setTimeout(() => {
 				contactStatus = 'idle';
 			}, 3000);
@@ -403,6 +517,7 @@
 	<canvas  
 			bind:this={ThreeObject}  
 			on:click={handleCanvasClick}
+			aria-hidden="true"
 			class="fixed top-0 left-0 w-full h-full cursor-grab transition-opacity duration-1000"
 		style:opacity={sceneReady ? 1 : 0} 
 		style:pointer-events={sceneReady ? 'auto' : 'none'} 
@@ -416,7 +531,9 @@
 {/if}
 
 <SocialBubbles />
-<AudioControls />
+{#if AudioControlsComponent}
+	<svelte:component this={AudioControlsComponent} />
+{/if}
 
 <!-- Seamless flowing content -->
 <div class="seamless-flow">
@@ -424,15 +541,17 @@
 		{personalData} 
 		{adaptiveTextClass} 
 		{bioFocusEnabled}
+		{isAudioEnabled}
+		{audioIntensity}
 		on:toggleBioFocus={handleToggleBioFocus}
 	/>
 <!-- Projects naturally flowing from bottom of page with biographical text -->
-		<div class="projects-flow relative px-4 sm:px-6 md:px-8 xl:px-16 2xl:px-24">
+		<div class="projects-flow relative px-0 sm:px-6 md:px-8 xl:px-16 2xl:px-24">
 		<div class="flex flex-col items-center xl:items-start xl:flex-row gap-16 2xl:gap-24">
 			
 			<!-- Left side - Projects -->
 			<div
-			class="projects-container w-full max-w-3xl xl:max-w-none xl:w-1/2"
+			class="projects-container w-full max-w-3xl xl:max-w-none xl:w-1/2 2xl:w-3/5"
 			bind:clientHeight={projectsHeight}
 			>
 			<ProjectsSection 
@@ -444,19 +563,15 @@
 			/>
 			</div>
 
-			<div class="w-full max-w-3xl xl:max-w-none xl:w-1/2 2xl:w-2/3 mt-12 xl:mt-0">
-				{#if showBio}
+			<div class="w-full max-w-3xl xl:max-w-none xl:w-1/2 2xl:w-2/5 mt-12 xl:mt-0">
 				<BiographicalSection
 					{scrollY}
 					{innerHeight}
 					{adaptiveSubTextClass}
-					bioProjectionEnabled={bioFocusEnabled}
-					on:toggleBioProjection={handleToggleBioProjection}
-				/>
-				{/if}
-				<ContactPortal
-					status={contactStatus}
-					error={contactError}
+					contactStatus={contactStatus}
+					contactError={contactError}
+					turnstileSiteKey={PUBLIC_TURNSTILE_SITE_KEY}
+					bind:turnstileToken
 					on:focusContact={(event) => handleContactFocus(event.detail)}
 					on:submitContact={handleContactSubmit}
 				/>
@@ -465,7 +580,7 @@
 		</div>
 		</div>
 
-<ProjectMediaOverlay media={activeMedia} onClose={closeProjectMedia} />
+<ProjectMediaOverlay media={activeMedia} onClose={closeProjectMedia} reducedMotion={reducedMotion} />
 
 
 <!-- Debug info (remove in production) -->
@@ -518,9 +633,6 @@
 
 	/* Responsive adjustments for mobile */
 	@media (max-width: 800px) {
-		.projects-container {
-			padding: 0 1rem;
-		}
 		canvas {
 		touch-action: pan-y;
 	}

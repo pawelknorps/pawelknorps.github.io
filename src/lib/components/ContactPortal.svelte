@@ -1,38 +1,122 @@
 <script>
   import { createEventDispatcher } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
 
   export let status = 'idle';
   export let error = '';
+  export let turnstileSiteKey = '';
+  export let turnstileToken = '';
 
   const dispatch = createEventDispatcher();
   let name = '';
   let email = '';
   let message = '';
+  let website = '';
+  let turnstileContainer;
+  let turnstileWidgetId = null;
+  const formStartedAt = Date.now();
+
+  const ensureTurnstileScript = async () => {
+    if (typeof window === 'undefined') return;
+    if (window.turnstile) return;
+    const existing = document.querySelector('script[data-knorps-turnstile="1"]');
+    if (existing) {
+      await new Promise((resolve) => existing.addEventListener('load', resolve, { once: true }));
+      return;
+    }
+    await new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+      script.async = true;
+      script.defer = true;
+      script.dataset.knorpsTurnstile = '1';
+      script.onload = resolve;
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+  };
+
+  const renderTurnstile = () => {
+    if (
+      typeof window === 'undefined' ||
+      !window.turnstile ||
+      !turnstileSiteKey ||
+      !turnstileContainer ||
+      turnstileWidgetId !== null
+    ) {
+      return;
+    }
+    turnstileWidgetId = window.turnstile.render(turnstileContainer, {
+      sitekey: turnstileSiteKey,
+      callback: 'onKnorpsTurnstileToken',
+      'expired-callback': 'onKnorpsTurnstileExpired',
+      'error-callback': 'onKnorpsTurnstileError',
+      theme: 'dark'
+    });
+  };
 
   const submit = () => {
-    dispatch('submitContact', { name, email, message });
+    dispatch('submitContact', { name, email, message, website, startedAt: formStartedAt });
   };
 
   const clear = () => {
     name = '';
     email = '';
     message = '';
+    website = '';
+    turnstileToken = '';
   };
 
   $: if (status === 'success') {
     clear();
+    if (typeof window !== 'undefined' && window.turnstile && turnstileWidgetId !== null) {
+      window.turnstile.reset(turnstileWidgetId);
+    }
   }
+
+  onMount(async () => {
+    if (typeof window === 'undefined') return;
+    window.onKnorpsTurnstileToken = (token) => {
+      turnstileToken = token || '';
+    };
+    window.onKnorpsTurnstileExpired = () => {
+      turnstileToken = '';
+    };
+    window.onKnorpsTurnstileError = () => {
+      turnstileToken = '';
+    };
+    if (turnstileSiteKey) {
+      try {
+        await ensureTurnstileScript();
+        renderTurnstile();
+      } catch (error) {
+        console.warn('Turnstile script failed to load:', error);
+      }
+    }
+  });
+
+  $: if (turnstileSiteKey) {
+    renderTurnstile();
+  }
+
+  onDestroy(() => {
+    if (typeof window === 'undefined') return;
+    delete window.onKnorpsTurnstileToken;
+    delete window.onKnorpsTurnstileExpired;
+    delete window.onKnorpsTurnstileError;
+  });
 </script>
 
-<section class="contact-portal pointer-events-auto mt-24 mb-24 w-full max-w-3xl xl:max-w-none xl:w-1/2 2xl:w-2/3">
+<section class="contact-portal pointer-events-auto">
   <div class="portal-shell">
-    <p class="portal-kicker">TRANSMISSION NODE</p>
-    <h3 class="portal-title">Contact Rift</h3>
+    <p class="portal-kicker">CONTACT</p>
+    <h3 class="portal-title">Get in touch</h3>
     <p class="portal-copy">
-      Open a channel. As you type, the sphere focuses into transmission mode.
+      Send a message and I will get back to you soon.
     </p>
 
     <form class="portal-form" on:submit|preventDefault={submit}>
+      <input type="text" bind:value={website} name="website" tabindex="-1" autocomplete="off" class="hp" aria-hidden="true" />
       <label>
         <span>Name</span>
         <input
@@ -69,17 +153,20 @@
         ></textarea>
       </label>
 
-      <button type="submit" disabled={status === 'submitting'}>
-        {status === 'submitting' ? 'Sending...' : 'Transmit'}
+      <button type="submit" disabled={status === 'submitting' || (turnstileSiteKey && !turnstileToken)}>
+        {status === 'submitting' ? 'Sending...' : 'Send message'}
       </button>
+      {#if turnstileSiteKey}
+        <div class="cf-turnstile mt-2" bind:this={turnstileContainer}></div>
+      {/if}
     </form>
 
     {#if status === 'success'}
-      <p class="portal-ok">Signal received. You should hear back soon.</p>
+      <p class="portal-ok" role="status">Message sent. Thank you.</p>
     {/if}
 
     {#if status === 'error'}
-      <p class="portal-error">{error || 'Transmission failed. Try again.'}</p>
+      <p class="portal-error" role="alert">{error || 'Could not send your message. Try again.'}</p>
     {/if}
   </div>
 </section>
@@ -88,46 +175,41 @@
   .contact-portal {
     position: relative;
     z-index: 25;
+    width: 100%;
   }
 
   .portal-shell {
-    border: 1px solid rgba(255, 0, 128, 0.45);
-    background:
-      radial-gradient(circle at 20% 10%, rgba(255, 0, 128, 0.22), transparent 45%),
-      radial-gradient(circle at 90% 90%, rgba(0, 142, 255, 0.22), transparent 42%),
-      rgba(6, 6, 14, 0.68);
-    backdrop-filter: blur(14px);
-    border-radius: 20px;
-    padding: 1.5rem;
-    box-shadow:
-      0 0 0 1px rgba(255, 255, 255, 0.08) inset,
-      0 22px 56px rgba(0, 0, 0, 0.48);
-    transform: skewY(-0.6deg);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(10, 14, 25, 0.56);
+    backdrop-filter: blur(10px);
+    border-radius: 14px;
+    padding: 1rem;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
   }
 
   .portal-kicker {
-    letter-spacing: 0.2em;
-    font-size: 0.68rem;
-    color: #ff7ac9;
-    margin-bottom: 0.25rem;
+    letter-spacing: 0.14em;
+    font-size: 0.64rem;
+    color: rgba(202, 214, 236, 0.78);
+    margin-bottom: 0.2rem;
   }
 
   .portal-title {
-    font-size: 1.8rem;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    font-size: 1.1rem;
+    letter-spacing: 0.02em;
     margin: 0 0 0.4rem;
-    color: #fff;
+    color: rgba(244, 248, 255, 0.96);
   }
 
   .portal-copy {
-    color: #c7d0e2;
-    margin-bottom: 1rem;
+    color: rgba(208, 220, 241, 0.9);
+    margin-bottom: 0.8rem;
+    font-size: 0.92rem;
   }
 
   .portal-form {
     display: grid;
-    gap: 0.8rem;
+    gap: 0.65rem;
   }
 
   label {
@@ -136,63 +218,72 @@
   }
 
   label span {
-    font-size: 0.72rem;
-    letter-spacing: 0.14em;
+    font-size: 0.64rem;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: #9cb0d8;
+    color: rgba(193, 207, 230, 0.78);
   }
 
   input,
   textarea {
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    background: rgba(0, 0, 0, 0.38);
-    color: #fff;
-    border-radius: 12px;
-    padding: 0.75rem 0.85rem;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(3, 7, 16, 0.42);
+    color: rgba(246, 250, 255, 0.96);
+    border-radius: 10px;
+    padding: 0.65rem 0.75rem;
     outline: none;
-    transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
   }
 
   input:focus,
   textarea:focus {
-    border-color: rgba(255, 0, 128, 0.8);
-    box-shadow: 0 0 0 2px rgba(255, 0, 128, 0.2);
-    transform: translateY(-1px);
+    border-color: rgba(176, 208, 255, 0.9);
+    box-shadow: 0 0 0 2px rgba(176, 208, 255, 0.15);
   }
 
   button {
     justify-self: start;
-    border: 1px solid rgba(255, 0, 128, 0.75);
-    color: #fff;
-    background: linear-gradient(135deg, rgba(255, 0, 128, 0.35), rgba(93, 76, 255, 0.35));
-    border-radius: 999px;
-    padding: 0.7rem 1.2rem;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    font-size: 0.72rem;
-    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    color: rgba(248, 250, 255, 0.96);
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    padding: 0.58rem 0.9rem;
+    letter-spacing: 0.02em;
+    font-size: 0.84rem;
+    transition: background 0.2s ease, border-color 0.2s ease;
   }
 
   button:hover:not(:disabled) {
-    transform: translateY(-2px) scale(1.03);
-    box-shadow: 0 8px 24px rgba(255, 0, 128, 0.35);
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.38);
+  }
+
+  button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 
   .portal-ok {
-    margin-top: 0.9rem;
-    color: #9fffd2;
-    font-size: 0.9rem;
+    margin-top: 0.6rem;
+    color: #b7f7dd;
+    font-size: 0.82rem;
   }
 
   .portal-error {
-    margin-top: 0.9rem;
-    color: #ff9fbc;
-    font-size: 0.9rem;
+    margin-top: 0.6rem;
+    color: #ffbfd0;
+    font-size: 0.82rem;
+  }
+
+  .hp {
+    position: absolute;
+    left: -9999px;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  :global(.cf-turnstile) {
+    min-height: 65px;
   }
   
-  @media (max-width: 900px) {
-    .portal-shell {
-      transform: none;
-    }
-  }
 </style>

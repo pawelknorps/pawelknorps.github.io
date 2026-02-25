@@ -43,10 +43,18 @@ class AudioSystem {
         this.userSoundProfileVersion = 2;
         this.narrationChannel = 1;
         this.activeNarrationNotes = new Set();
+        this.narrationNoteTimeouts = new Map();
     }
 
     async init() {
-        if (this.isInitialized) return;
+        if (this.isInitialized) {
+            if (this.audioContext?.state === 'suspended') {
+                await this.audioContext.resume();
+            }
+            // Scene lifecycles can detach keyboard handlers; ensure they are always reattached.
+            this.attachComputerKeyboard();
+            return;
+        }
 
         try {
             this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -309,17 +317,49 @@ class AudioSystem {
         const baseNote = 52;
         const note = baseNote + scale[step];
         const isSentence = boundaryName === 'sentence';
-        const velocity = Math.round(62 + progress * 42 + (isSentence ? 16 : 0));
-        const clampedVelocity = Math.max(0, Math.min(127, velocity));
+        const phraseShape = Math.sin(progress * Math.PI);
+        const velocityBase = 58 + progress * 24 + phraseShape * 18 + (isSentence ? 12 : 0);
+        const velocityJitter = (Math.random() - 0.5) * 22;
+        const accentChance = isSentence ? 0.34 : 0.16;
+        const accentBoost = Math.random() < accentChance ? (8 + Math.random() * 14) : 0;
+        const velocity = Math.round(velocityBase + velocityJitter + accentBoost);
+        const clampedVelocity = Math.max(40, Math.min(124, velocity));
 
-        // Always drive visual-reactive pulses.
+        const rhythmicDrift = Math.sin(progress * Math.PI * 3 + (Number(charIndex) || 0) * 0.07) * 24;
+        const releaseBase = isSentence ? 220 : 90;
+        const releaseRandom = isSentence ? 180 : 140;
+        const narrationReleaseMs = Math.max(
+            70,
+            Math.min(520, Math.round(releaseBase + rhythmicDrift + Math.random() * releaseRandom))
+        );
+
+        // Route narration boundaries into RNBO when available.
+        if (this.rnboDevice && this.rnboPkg && this.audioContext) {
+            this.noteOn(note, clampedVelocity, this.narrationChannel);
+            this.activeNarrationNotes.add(note);
+
+            const existingTimeoutId = this.narrationNoteTimeouts.get(note);
+            if (existingTimeoutId) {
+                window.clearTimeout(existingTimeoutId);
+            }
+
+            const timeoutId = window.setTimeout(() => {
+                this.noteOff(note, this.narrationChannel);
+                this.activeNarrationNotes.delete(note);
+                this.narrationNoteTimeouts.delete(note);
+            }, narrationReleaseMs);
+
+            this.narrationNoteTimeouts.set(note, timeoutId);
+            return;
+        }
+
+        // Fallback for when RNBO is unavailable (e.g. mobile path).
         this.noteTriggerHandler?.(note, clampedVelocity);
-
-        // Intentionally do not send RNBO/MIDI notes for narration boundaries.
-        // Narration should only drive visual-reactive pulses.
     }
 
     clearNarrationPulses() {
+        this.narrationNoteTimeouts.forEach((timeoutId) => window.clearTimeout(timeoutId));
+        this.narrationNoteTimeouts.clear();
         if (this.activeNarrationNotes.size === 0) return;
         [...this.activeNarrationNotes].forEach((note) => this.noteOff(note, this.narrationChannel));
         this.activeNarrationNotes.clear();
@@ -626,7 +666,7 @@ class AudioSystem {
         if (!this.isInitialized) return;
 
         const now = performance.now();
-        if (now - this.lastCallTimes.ambient < 2200) return;
+        if (now - this.lastCallTimes.ambient < 1400) return;
         this.lastCallTimes.ambient = now;
 
         const currentTime = this.audioContext.currentTime;
@@ -634,30 +674,37 @@ class AudioSystem {
         const texture = this.audioContext.createOscillator();
         const filter = this.audioContext.createBiquadFilter();
         const gain = this.audioContext.createGain();
+        const stereo = this.audioContext.createStereoPanner();
 
         tonal.type = 'triangle';
         texture.type = 'sawtooth';
-        tonal.frequency.setValueAtTime(120 + Math.random() * 80, currentTime);
-        texture.frequency.setValueAtTime(42 + Math.random() * 20, currentTime);
+        tonal.frequency.setValueAtTime(95 + Math.random() * 130, currentTime);
+        texture.frequency.setValueAtTime(30 + Math.random() * 42, currentTime);
+        tonal.detune.setValueAtTime(-8 + Math.random() * 16, currentTime);
+        texture.detune.setValueAtTime(-12 + Math.random() * 24, currentTime);
 
         filter.type = 'bandpass';
-        filter.frequency.setValueAtTime(240 + Math.random() * 420, currentTime);
-        filter.Q.setValueAtTime(2.4 + Math.random() * 3.2, currentTime);
+        filter.frequency.setValueAtTime(180 + Math.random() * 560, currentTime);
+        filter.Q.setValueAtTime(1.8 + Math.random() * 2.4, currentTime);
+        stereo.pan.setValueAtTime(-0.35 + Math.random() * 0.7, currentTime);
 
-        const target = Math.max(0.003, Math.min(0.03, 0.008 + intensity * 0.02));
+        const target = Math.max(0.008, Math.min(0.06, 0.014 + intensity * 0.035));
         gain.gain.setValueAtTime(0.0001, currentTime);
-        gain.gain.exponentialRampToValueAtTime(target, currentTime + 0.14);
-        gain.gain.exponentialRampToValueAtTime(0.0001, currentTime + 1.1 + Math.random() * 0.8);
+        gain.gain.exponentialRampToValueAtTime(target, currentTime + 0.2);
+        gain.gain.exponentialRampToValueAtTime(0.0001, currentTime + 1.8 + Math.random() * 1.4);
 
         tonal.connect(filter);
         texture.connect(filter);
         filter.connect(gain);
-        gain.connect(this.masterGain);
+        gain.connect(stereo);
+
+        // Always route ambient texture through masterGain so RNBO stays in the signal path.
+        stereo.connect(this.masterGain);
 
         tonal.start();
         texture.start();
-        tonal.stop(currentTime + 1.9);
-        texture.stop(currentTime + 1.9);
+        tonal.stop(currentTime + 3.4);
+        texture.stop(currentTime + 3.4);
     }
 
     playMorphSound(morphFactor) {

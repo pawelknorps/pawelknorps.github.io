@@ -121,10 +121,10 @@
 		name="description"
 		content="Portfolio of Paweł Knorps, a composer, guitarist, bassist, producer."
 	/>
-	<link rel="canonical" href="https://pawelknorps.github.io/" />
+	<link rel="canonical" href="https://knorps.com/" />
 
 	<meta property="og:type" content="website" />
-	<meta property="og:url" content="https://pawelknorps.github.io/" />
+	<meta property="og:url" content="https://knorps.com/" />
 	<meta
 		property="og:title"
 		content="Paweł Knorps - Composer Guitarist Portfolio"
@@ -135,11 +135,11 @@
 	/>
 	<meta
 		property="og:image"
-		content="https://pawelknorps.github.io/my-photo2.webp"
+		content="https://knorps.com/my-photo2.webp"
 	/>
 
 	<meta property="twitter:card" content="summary_large_image" />
-	<meta property="twitter:url" content="https://pawelknorps.github.io/" />
+	<meta property="twitter:url" content="https://knorps.com/" />
 	<meta
 		property="twitter:title"
 		content="Paweł Knorps - Composer Guitarist Portfolio"
@@ -150,12 +150,12 @@
 	/>
 	<meta
 		property="twitter:image"
-		content="https://pawelknorps.github.io/my-photo2.webp"
+		content="https://knorps.com/my-photo2.webp"
 	/>
 	<meta name="robots" content="max-image-preview:large" />
 	<meta
 		property="og:image"
-		content="https://pawelknorps.github.io/my-photo.webp"
+		content="https://knorps.com/my-photo.webp"
 	/>
 	<meta property="og:image:width" content="1200" />
 	<meta property="og:image:height" content="1200" />
@@ -166,8 +166,8 @@
 			"@context": "https://schema.org",
 			"@type": "MusicGroup",
 			"name": "Paweł Knorps",
-			"url": "https://pawelknorps.github.io/",
-			"image": "https://pawelknorps.github.io/my-photo.webp",
+			"url": "https://knorps.com/",
+			"image": "https://knorps.com/my-photo.webp",
 			"description": "Portfolio of Paweł Knorps, a composer, guitarist, bassist, producer.",
 			"jobTitle": ["Composer", "Guitarist", "Bassist", "Producer"],
 			"sameAs": [

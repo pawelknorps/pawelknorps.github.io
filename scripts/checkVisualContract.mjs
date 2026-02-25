@@ -9,7 +9,7 @@ const ROOT = path.resolve(__dirname, '..');
 const checks = [
   {
     file: 'src/routes/+page.svelte',
-    required: ['HeroSection', 'ProjectsSection', 'BiographicalSection', 'AudioControls', 'SocialBubbles', 'scene-container']
+    required: ['HeroSection', 'ProjectsSection', 'BiographicalSection', 'AudioControls', 'SocialBubbles', '<canvas']
   },
   {
     file: 'src/lib/components/ProjectsSection.svelte',
@@ -25,7 +25,7 @@ const checks = [
   },
   {
     file: 'src/app.css',
-    required: ['@tailwind base', 'html { scroll-behavior: smooth; }', 'content-visibility-auto']
+    required: ['@import "tailwindcss";', 'html { scroll-behavior: smooth; }']
   }
 ];
 

@@ -6,7 +6,11 @@
 		"dev": "vite dev",
 		"build": "vite build",
 		"preview": "vite preview",
-		"deploy": "gh-pages -d build -t"
+		"deploy": "gh-pages -d build -t",
+		"pipeline:validate": "node scripts/validatePortfolio.mjs",
+		"pipeline:schema-drift": "node scripts/checkSchemaDrift.mjs",
+		"pipeline:bundle-budget": "BUNDLE_BUDGET_JS_BYTES=760000 node scripts/checkBundleBudget.mjs",
+		"pipeline:visual-contract": "node scripts/checkVisualContract.mjs"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-static": "^3.0.10",

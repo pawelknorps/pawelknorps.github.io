@@ -27,6 +27,7 @@
 	import ProjectsSection from '$lib/components/ProjectsSection.svelte';
 	import BiographicalSection from '$lib/components/BiographicalSection.svelte';
 	import ProjectMediaOverlay from '$lib/components/ProjectMediaOverlay.svelte';
+	import ContactPortal from '$lib/components/ContactPortal.svelte';
 	import { resolveProjectMedia } from '$lib/utils/projectMedia.js';
 	import { audioSystem } from '$lib/AudioSystem.js';
 	
@@ -58,6 +59,9 @@
 	let activeMedia = null;
 	let speechVoices = [];
 	let selectedNarrationVoice = null;
+	let contactFocusEnabled = false;
+	let contactStatus = 'idle';
+	let contactError = '';
 	$: showBio = innerWidth >= 1300;
 	$: projectsHeight = 0;
 
@@ -69,7 +73,7 @@
 	Każda z tych formacji jest przejawem niezaspokojonej ciekawości w poszukiwaniu własnej ekspresji.`;
 
 	const syncSceneFocus = () => {
-		setBioProjectionEnabled(bioFocusEnabled || !!activeMedia);
+		setBioProjectionEnabled(bioFocusEnabled || contactFocusEnabled || !!activeMedia);
 	};
 
 	const openProjectMedia = (project) => {
@@ -350,6 +354,45 @@
 		syncSceneFocus();
 	};
 
+	const handleContactFocus = (focused) => {
+		contactFocusEnabled = !!focused;
+		syncSceneFocus();
+	};
+
+	const handleContactSubmit = async (event) => {
+		const { name, email, message } = event.detail || {};
+		contactStatus = 'submitting';
+		contactError = '';
+		contactFocusEnabled = true;
+		syncSceneFocus();
+		try {
+			const response = await fetch('/api/contact', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					name,
+					email,
+					message,
+					source: 'knorps.com artistic contact portal'
+				})
+			});
+			const result = await response.json().catch(() => ({}));
+			if (!response.ok || !result?.ok) {
+				throw new Error(result?.error || 'Failed to send message');
+			}
+			contactStatus = 'success';
+			setTimeout(() => {
+				contactStatus = 'idle';
+			}, 3000);
+		} catch (error) {
+			contactStatus = 'error';
+			contactError = error?.message || 'Failed to send message';
+		} finally {
+			contactFocusEnabled = false;
+			syncSceneFocus();
+		}
+	};
+
 </script>
 
 <svelte:window bind:scrollY bind:innerHeight bind:innerWidth />
@@ -401,8 +444,8 @@
 			/>
 			</div>
 
-			{#if showBio}
 			<div class="w-full max-w-3xl xl:max-w-none xl:w-1/2 2xl:w-2/3 mt-12 xl:mt-0">
+				{#if showBio}
 				<BiographicalSection
 					{scrollY}
 					{innerHeight}
@@ -410,8 +453,14 @@
 					bioProjectionEnabled={bioFocusEnabled}
 					on:toggleBioProjection={handleToggleBioProjection}
 				/>
+				{/if}
+				<ContactPortal
+					status={contactStatus}
+					error={contactError}
+					on:focusContact={(event) => handleContactFocus(event.detail)}
+					on:submitContact={handleContactSubmit}
+				/>
 			</div>
-			{/if}
 		</div>
 		</div>
 		</div>

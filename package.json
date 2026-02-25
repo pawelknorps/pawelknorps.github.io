@@ -9,7 +9,10 @@
 		"deploy": "gh-pages -d build -t",
 		"pipeline:validate": "node scripts/validatePortfolio.mjs",
 		"pipeline:export": "node scripts/exportPortfolioFromSanity.mjs",
-		"portfolio:release": "node scripts/releasePortfolio.mjs"
+		"portfolio:release": "node scripts/releasePortfolio.mjs",
+		"pipeline:schema-drift": "node scripts/checkSchemaDrift.mjs",
+		"pipeline:visual-contract": "node scripts/checkVisualContract.mjs",
+		"pipeline:bundle-budget": "node scripts/checkBundleBudget.mjs"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-static": "^3.0.9",

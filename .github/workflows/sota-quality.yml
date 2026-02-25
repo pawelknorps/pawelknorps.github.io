@@ -1,0 +1,36 @@
+name: SOTA Quality Gates
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate data
+        run: npm run pipeline:validate
+
+      - name: Check schema drift
+        run: npm run pipeline:schema-drift
+
+      - name: Build
+        run: npm run build
+
+      - name: Check bundle budget
+        run: npm run pipeline:bundle-budget
+
+      - name: Check visual contract
+        run: npm run pipeline:visual-contract

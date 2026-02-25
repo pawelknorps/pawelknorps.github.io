@@ -1,5 +1,4 @@
-// schemaTypes/project.js
-import { defineField, defineType } from 'sanity'
+import { defineField, defineType } from 'sanity';
 
 export default defineType({
     name: 'project',
@@ -25,13 +24,37 @@ export default defineType({
                 layout: 'radio'
             }
         }),
+        defineField({
+            name: 'status',
+            title: 'Status',
+            type: 'string',
+            initialValue: 'published',
+            options: {
+                list: [
+                    { title: 'Published', value: 'published' },
+                    { title: 'Draft', value: 'draft' },
+                    { title: 'Archived', value: 'archived' }
+                ],
+                layout: 'radio'
+            }
+        }),
+        defineField({
+            name: 'publishAt',
+            title: 'Publish At',
+            type: 'datetime',
+            description: 'Optional. If set, project appears only after this time.'
+        }),
+        defineField({
+            name: 'unpublishAt',
+            title: 'Unpublish At',
+            type: 'datetime',
+            description: 'Optional. If set, project disappears after this time.'
+        }),
         defineField({ name: 'type', title: 'Project Type', type: 'string' }),
         defineField({ name: 'year', title: 'Year', type: 'string' }),
         defineField({ name: 'releaseDate', title: 'Release Date', type: 'date' }),
         defineField({ name: 'description', title: 'Description', type: 'text' }),
         defineField({ name: 'funding', title: 'Funding/Grants', type: 'string' }),
-
-        // Lists
         defineField({
             name: 'features',
             title: 'Features',
@@ -52,8 +75,6 @@ export default defineType({
             of: [{ type: 'string' }],
             hidden: ({ document }) => document?.category === 'music'
         }),
-
-        // Links
         defineField({
             name: 'links',
             title: 'Links',
@@ -71,27 +92,19 @@ export default defineType({
                 { name: 'maps', type: 'url' }
             ]
         }),
-
-        // Color (for Three.js)
         defineField({ name: 'color', title: 'Color Hex/Name', type: 'string' }),
-
-        // Cover Image
         defineField({
             name: 'cover',
             title: 'Cover Image',
             type: 'image',
             options: { hotspot: true }
         }),
-
-        // Order Rank (for manual sorting)
         defineField({
             name: 'orderRank',
             title: 'Order Rank',
             type: 'string',
-            hidden: true,
+            hidden: true
         }),
-
-        // Video Aspect Ratio (for correct cropping)
         defineField({
             name: 'videoAspectRatio',
             title: 'Video Aspect Ratio',
@@ -105,7 +118,7 @@ export default defineType({
                 layout: 'radio'
             },
             initialValue: '16:9',
-            description: 'Select "Square" for 1:1 videos (like Stan Wody) to crop them correctly. Select "Vertical" for Reels.'
+            description: 'Select "Square" for 1:1 videos or "Vertical" for reels.'
         })
     ]
-})
+});

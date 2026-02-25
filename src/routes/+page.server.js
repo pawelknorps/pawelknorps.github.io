@@ -1,10 +1,9 @@
 import { client } from '$lib/sanity/client';
-import localData from '../../data.json'; // Fallback data
+import localData from '../../data.json';
 
 export const prerender = true;
 
 export const load = async () => {
-    // If project ID is not set, return local data to avoid crashing
     if (client.config().projectId === 'YOUR_PROJECT_ID') {
         console.warn('⚠️ Sanity Project ID not set. Using local fallback data.');
         return {
@@ -13,13 +12,13 @@ export const load = async () => {
     }
 
     const query = `{
-
-    "musicProjects": *[_type == "project" && category == "music" && !(_id in path("drafts.**"))] {..., "videoAspectRatio": coalesce(videoAspectRatio, "16:9")} | order(orderRank asc, coalesce(releaseDate, year) desc),
-    "programmingProjects": *[_type == "project" && category == "programming" && !(_id in path("drafts.**"))] | order(orderRank asc, coalesce(releaseDate, year) desc)
-  }`;
+        "musicProjects": *[_type == "project" && category == "music" && !(_id in path("drafts.**")) && coalesce(status, "published") == "published" && (!defined(publishAt) || publishAt <= $now) && (!defined(unpublishAt) || unpublishAt > $now)] {..., "videoAspectRatio": coalesce(videoAspectRatio, "16:9")} | order(orderRank asc, coalesce(releaseDate, year) desc),
+        "programmingProjects": *[_type == "project" && category == "programming" && !(_id in path("drafts.**")) && coalesce(status, "published") == "published" && (!defined(publishAt) || publishAt <= $now) && (!defined(unpublishAt) || unpublishAt > $now)] | order(orderRank asc, coalesce(releaseDate, year) desc)
+    }`;
 
     try {
-        const data = await client.fetch(query);
+        const now = new Date().toISOString();
+        const data = await client.fetch(query, { now });
         return {
             portfolioData: data
         };

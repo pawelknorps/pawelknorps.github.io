@@ -6,7 +6,10 @@
 		"dev": "vite dev",
 		"build": "vite build",
 		"preview": "vite preview",
-		"deploy": "gh-pages -d build -t"
+		"deploy": "gh-pages -d build -t",
+		"pipeline:validate": "node scripts/validatePortfolio.mjs",
+		"pipeline:export": "node scripts/exportPortfolioFromSanity.mjs",
+		"portfolio:release": "node scripts/releasePortfolio.mjs"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-static": "^3.0.9",

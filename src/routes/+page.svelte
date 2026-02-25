@@ -1,20 +1,3 @@
-<svelte:head>
-    <title>Paweł Knorps - Composer Guitarist Portfolio</title>
-    <meta name="description" content="Portfolio of Paweł Knorps, a composer, guitarist, basist, producer." />
-    <link rel="canonical" href="https://pawelknorps.github.io/" />
-
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://pawelknorps.github.io/" />
-    <meta property="og:title" content="Paweł Knorps - Composer Guitarist Portfolio" />
-    <meta property="og:description" content="Portfolio of Paweł Knorps, a composer, guitarist, basist, producer." />
-    <meta property="og:image" content="https://pawelknorps.github.io/og-image.png" />
-
-    <meta property="twitter:card" content="summary_large_image" />
-    <meta property="twitter:url" content="https://pawelknorps.github.io/" />
-    <meta property="twitter:title" content="Paweł Knorps - Composer Guitarist Portfolio" />
-    <meta property="twitter:description" content="Portfolio of Paweł Knorps, a composer, guitarist, basist, producer." />
-    <meta property="twitter:image" content="https://pawelknorps.github.io/og-image.png" />
-</svelte:head>
 <script>
 	// Library Imports
 	import { setScene, updateProjects, setBioProjectionEnabled, setProjectOpenHandler, setProjectedVideo, clearProjectedVideo } from '$lib/ThreeObject.js';
@@ -31,14 +14,19 @@
 
 	// 🚀 Ta zmienna przychodzi z load()
 	export let data; // SvelteKit domyślnie przekazuje `data` z load()
-	const portfolioData = data.portfolioData;
 
-	// Create a new wavy sphere scene
-	let ThreeObject;
-	let sceneInitialized = false;
-	let sceneReady = false; // New state to track if the scene is loaded
+	// Ensure portfolioData exists, otherwise default to empty objects to prevent crashes
+	const portfolioData = data?.portfolioData || {
+		musicProjects: [],
+		programmingProjects: [],
+	};
+
+	// Lazy Loading State
+	let ThreeComponent;
+	let sceneReady = false;
+	let threeSceneInstance;
+
 	// Project data
-	let personalData = {};
 	let musicProjects = [];
 	let programmingProjects = [];
 
@@ -46,11 +34,11 @@
 	let scrollY = 0;
 	let innerHeight = 0;
 	let innerWidth = 0;
-	
+
 	// Background brightness detection for text readability
 	let backgroundBrightness = 0.5; // Default middle brightness
-	let adaptiveTextClass = 'text-white';
-	let adaptiveSubTextClass = 'text-gray-300';
+	let adaptiveTextClass = "text-white";
+	let adaptiveSubTextClass = "text-gray-300";
 
 	let bioFocusEnabled = false;
 	let activeMedia = null;
@@ -211,27 +199,23 @@
 
 	// Audio state tracking
 	let isAudioEnabled = false;
+	let showVideo = false; // State for "STAN WODY" video background
+	let videoElement; // Reference to the video element
 
-	// Sample brightness periodically
-	let brightnessInterval;
-	
 	onMount(async () => {
 		// Wait for DOM to be ready
 		await tick();
-		
-        // ✅ portfolioData już jest z `load()`, nie fetchuj go ponownie
+		// ✅ portfolioData już jest z `load()`, nie fetchuj go ponownie
 		if (portfolioData) {
-			personalData = portfolioData.personal;
 			musicProjects = portfolioData.musicProjects;
 			programmingProjects = portfolioData.programmingProjects;
-			
-			console.log('Portfolio data loaded:', {
-				personal: !!personalData,
+
+			console.log("Portfolio data loaded:", {
 				musicProjects: musicProjects.length,
-				programmingProjects: programmingProjects.length
+				programmingProjects: programmingProjects.length,
 			});
 		} else {
-			console.error('Brak danych portfolio');
+			console.error("Brak danych portfolio");
 		}
 		
 		// Wait a bit more for canvas to be available
@@ -259,7 +243,9 @@
 			console.log('Manual scene initialization triggered');
 			initializeScene();
 		}
-		// Audio will be initialized automatically in ThreeObject.js onMouseDown
+	});
+
+	const handleAudioReq = () => {
 		isAudioEnabled = true;
 	};
 
@@ -279,9 +265,86 @@
 
 </script>
 
+<svelte:head>
+	<title>Paweł Knorps - Composer Guitarist Portfolio</title>
+	<meta
+		name="description"
+		content="Portfolio of Paweł Knorps, a composer, guitarist, bassist, producer."
+	/>
+	<link rel="canonical" href="https://knorps.com/" />
+
+	<meta property="og:type" content="website" />
+	<meta property="og:url" content="https://knorps.com/" />
+	<meta
+		property="og:title"
+		content="Paweł Knorps - Composer Guitarist Portfolio"
+	/>
+	<meta
+		property="og:description"
+		content="Portfolio of Paweł Knorps, a composer, guitarist, bassist, producer."
+	/>
+	<meta
+		property="og:image"
+		content="https://knorps.com/my-photo2.webp"
+	/>
+
+	<meta property="twitter:card" content="summary_large_image" />
+	<meta property="twitter:url" content="https://knorps.com/" />
+	<meta
+		property="twitter:title"
+		content="Paweł Knorps - Composer Guitarist Portfolio"
+	/>
+	<meta
+		property="twitter:description"
+		content="Portfolio of Paweł Knorps, a composer, guitarist, bassist, producer."
+	/>
+	<meta
+		property="twitter:image"
+		content="https://knorps.com/my-photo2.webp"
+	/>
+	<meta name="robots" content="max-image-preview:large" />
+	<meta
+		property="og:image"
+		content="https://knorps.com/my-photo.webp"
+	/>
+	<meta property="og:image:width" content="1200" />
+	<meta property="og:image:height" content="1200" />
+	<meta property="og:type" content="profile" />
+
+	<script type="application/ld+json">
+		{
+			"@context": "https://schema.org",
+			"@type": "MusicGroup",
+			"name": "Paweł Knorps",
+			"url": "https://knorps.com/",
+			"image": "https://knorps.com/my-photo.webp",
+			"description": "Portfolio of Paweł Knorps, a composer, guitarist, bassist, producer.",
+			"jobTitle": ["Composer", "Guitarist", "Bassist", "Producer"],
+			"sameAs": [
+				"https://www.instagram.com/pawelknorps",
+				"https://www.facebook.com/pawelknorps",
+				"https://soundcloud.com/pawelknorps",
+				"https://www.youtube.com/@pawelknorps"
+			]
+		}
+	</script>
+</svelte:head>
+
 <svelte:window bind:scrollY bind:innerHeight bind:innerWidth />
-{#if !sceneReady}
-		<div class="fixed top-0 left-0 w-full h-full gradient-placeholder z-0"></div> 
+
+<!-- Scene Container for LCP and CLS optimization -->
+<div class="scene-container fixed top-0 left-0 w-full h-full z-0">
+	{#if !sceneReady}
+		<img
+			src="{base}/scene-poster.webp"
+			alt="3D Scene Preview"
+			class="poster absolute inset-0 w-full h-full object-cover z-10"
+			out:fade={{ duration: 1000 }}
+		/>
+		<!-- Fallback gradient if image fails or while loading -->
+		<div
+			class="absolute inset-0 w-full h-full gradient-placeholder -z-10"
+		></div>
 	{/if}
 
 	<canvas  
@@ -297,6 +360,14 @@
 <div class="audio-notice fixed top-6 left-1/2 transform -translate-x-1/2 z-50 bg-black/80 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm border border-white/20 transition-all duration-300">
 		 touch the sphere for audio
 </div>
+
+<!-- Simple audio enable notice - top center -->
+{#if sceneReady && !isAudioEnabled && !showVideo}
+	<div
+		class="audio-notice fixed top-16 left-1/2 transform -translate-x-1/2 z-50 bg-black/80 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm border border-white/20 transition-all duration-300"
+	>
+		touch the sphere for audio
+	</div>
 {/if}
 
 <SocialBubbles />
@@ -353,14 +424,8 @@
 <div class="fixed bottom-4 left-4 z-50 bg-red-900/70 text-white px-3 py-2 rounded-lg text-sm backdrop-blur-sm">
 	⚠️ Scene not initialized - click canvas to retry
 </div>
-{/if} -->
 
 <style>
-	/* Smooth scrolling */
-	html {
-		scroll-behavior: smooth;
-	}
-
 	/* Seamless flow container */
 	.seamless-flow {
 		background: transparent;
@@ -377,29 +442,19 @@
 		pointer-events: auto;
 	}
 
-	/* By default, let Three.js control all gestures */
-	canvas {
-	touch-action: none;
-	}
-
 	/* Simple audio notice */
 	.audio-notice {
 		animation: gentlePulse 2s ease-in-out infinite;
 	}
 
 	@keyframes gentlePulse {
-		0%, 100% { opacity: 0.9; }
-		50% { opacity: 1; }
-	}
-
-	/* Responsive adjustments for mobile */
-	@media (max-width: 800px) {
-		.projects-container {
-			padding: 0 1rem;
+		0%,
+		100% {
+			opacity: 0.9;
 		}
-		canvas {
-		touch-action: pan-y;
-	}
+		50% {
+			opacity: 1;
+		}
 	}
 
 	/* Large screen adjustments */
@@ -411,26 +466,26 @@
 
 	/* Text selection styling */
 	::selection {
-		background-color: #FF0080;
+		background-color: #ff0080;
 		color: white;
 	}
-	   .gradient-placeholder {
-        background: linear-gradient(-45deg, #0f0f0f, #1a1a1a, #2a2a2a, #3a3a3a);
-        background-size: 400% 400%;
-        animation: gradient-animation 15s ease infinite;
-    }
+	.gradient-placeholder {
+		background: linear-gradient(-45deg, #0f0f0f, #1a1a1a, #2a2a2a, #3a3a3a);
+		background-size: 400% 400%;
+		animation: gradient-animation 15s ease infinite;
+	}
 
-    @keyframes gradient-animation {
-        0% {
-            background-position: 0% 50%;
-        }
-        50% {
-            background-position: 100% 50%;
-        }
-        100% {
-            background-position: 0% 50%;
-        }
-    }
+	@keyframes gradient-animation {
+		0% {
+			background-position: 0% 50%;
+		}
+		50% {
+			background-position: 100% 50%;
+		}
+		100% {
+			background-position: 0% 50%;
+		}
+	}
 
 	/* Remove any visual separations */
 	* {

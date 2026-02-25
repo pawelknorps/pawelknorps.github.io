@@ -41,9 +41,6 @@ class AudioSystem {
         this.noteTriggerHandler = null;
         this.userSoundProfile = null;
         this.userSoundProfileVersion = 2;
-        this.narrationChannel = 1;
-        this.activeNarrationNotes = new Set();
-        this.narrationNoteTimeouts = new Map();
     }
 
     async init() {
@@ -325,44 +322,12 @@ class AudioSystem {
         const velocity = Math.round(velocityBase + velocityJitter + accentBoost);
         const clampedVelocity = Math.max(40, Math.min(124, velocity));
 
-        const rhythmicDrift = Math.sin(progress * Math.PI * 3 + (Number(charIndex) || 0) * 0.07) * 24;
-        const releaseBase = isSentence ? 220 : 90;
-        const releaseRandom = isSentence ? 180 : 140;
-        const narrationReleaseMs = Math.max(
-            70,
-            Math.min(520, Math.round(releaseBase + rhythmicDrift + Math.random() * releaseRandom))
-        );
-
-        // Route narration boundaries into RNBO when available.
-        if (this.rnboDevice && this.rnboPkg && this.audioContext) {
-            this.noteOn(note, clampedVelocity, this.narrationChannel);
-            this.activeNarrationNotes.add(note);
-
-            const existingTimeoutId = this.narrationNoteTimeouts.get(note);
-            if (existingTimeoutId) {
-                window.clearTimeout(existingTimeoutId);
-            }
-
-            const timeoutId = window.setTimeout(() => {
-                this.noteOff(note, this.narrationChannel);
-                this.activeNarrationNotes.delete(note);
-                this.narrationNoteTimeouts.delete(note);
-            }, narrationReleaseMs);
-
-            this.narrationNoteTimeouts.set(note, timeoutId);
-            return;
-        }
-
-        // Fallback for when RNBO is unavailable (e.g. mobile path).
+        // Narration should stay decoupled from RNBO audio and only drive visuals.
         this.noteTriggerHandler?.(note, clampedVelocity);
     }
 
     clearNarrationPulses() {
-        this.narrationNoteTimeouts.forEach((timeoutId) => window.clearTimeout(timeoutId));
-        this.narrationNoteTimeouts.clear();
-        if (this.activeNarrationNotes.size === 0) return;
-        [...this.activeNarrationNotes].forEach((note) => this.noteOff(note, this.narrationChannel));
-        this.activeNarrationNotes.clear();
+        // Narration no longer triggers RNBO notes.
     }
 
     isEditableTarget(target) {

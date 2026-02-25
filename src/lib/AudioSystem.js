@@ -41,8 +41,6 @@ class AudioSystem {
         this.noteTriggerHandler = null;
         this.userSoundProfile = null;
         this.userSoundProfileVersion = 2;
-        this.narrationChannel = 1;
-        this.activeNarrationNotes = new Set();
     }
 
     async init() {
@@ -312,7 +310,7 @@ class AudioSystem {
         const velocity = Math.round(62 + progress * 42 + (isSentence ? 16 : 0));
         const clampedVelocity = Math.max(0, Math.min(127, velocity));
 
-        // Always drive visual-reactive pulses.
+        // Narration should stay decoupled from RNBO audio and only drive visuals.
         this.noteTriggerHandler?.(note, clampedVelocity);
 
         // Intentionally do not send RNBO/MIDI notes for narration boundaries.
@@ -320,9 +318,7 @@ class AudioSystem {
     }
 
     clearNarrationPulses() {
-        if (this.activeNarrationNotes.size === 0) return;
-        [...this.activeNarrationNotes].forEach((note) => this.noteOff(note, this.narrationChannel));
-        this.activeNarrationNotes.clear();
+        // Narration no longer triggers RNBO notes.
     }
 
     isEditableTarget(target) {

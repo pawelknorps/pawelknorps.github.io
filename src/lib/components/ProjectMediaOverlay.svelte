@@ -1,32 +1,105 @@
 <script>
+	import { tick } from 'svelte';
+	import SandboxedEmbed from '$lib/components/SandboxedEmbed.svelte';
+
 	export let media = null;
 	export let onClose = () => {};
+	export let reducedMotion = false;
+
+	let overlayEl;
+	let lastFocusedElement = null;
+
+	const FOCUSABLE_SELECTORS = [
+		'button:not([disabled])',
+		'a[href]',
+		'input:not([disabled])',
+		'select:not([disabled])',
+		'textarea:not([disabled])',
+		'[tabindex]:not([tabindex="-1"])'
+	].join(',');
+
+	const closeOverlay = () => {
+		onClose?.();
+	};
+
+	const handleOverlayClick = (event) => {
+		if (event.target === overlayEl) {
+			closeOverlay();
+		}
+	};
+
+	const trapFocus = (event) => {
+		if (event.key === 'Escape') {
+			event.preventDefault();
+			closeOverlay();
+			return;
+		}
+		if (event.key !== 'Tab' || !overlayEl) return;
+
+		const focusable = [...overlayEl.querySelectorAll(FOCUSABLE_SELECTORS)].filter(
+			(el) => !el.hasAttribute('disabled') && el.getAttribute('aria-hidden') !== 'true'
+		);
+		if (focusable.length === 0) return;
+
+		const first = focusable[0];
+		const last = focusable[focusable.length - 1];
+		const active = document.activeElement;
+
+		if (event.shiftKey && active === first) {
+			event.preventDefault();
+			last.focus();
+			return;
+		}
+		if (!event.shiftKey && active === last) {
+			event.preventDefault();
+			first.focus();
+		}
+	};
+
+	$: if (media) {
+		lastFocusedElement = document.activeElement;
+		tick().then(() => {
+			const focusable = overlayEl?.querySelector(FOCUSABLE_SELECTORS);
+			focusable?.focus();
+		});
+	}
+
+	$: if (!media && lastFocusedElement?.focus) {
+		lastFocusedElement.focus();
+		lastFocusedElement = null;
+	}
 </script>
 
 {#if media}
-	<div class="media-overlay">
+	<div
+		class="media-overlay"
+		bind:this={overlayEl}
+		role="dialog"
+		aria-modal="true"
+		aria-label={media.title || 'Project media'}
+		tabindex="-1"
+		on:click={handleOverlayClick}
+		on:keydown={trapFocus}
+	>
 		<div class="media-shell">
 			<div class="media-topbar">
 				<div class="media-meta">
 					<h3>{media.title}</h3>
 					<p>{media.subtitle}</p>
 				</div>
-				<button type="button" class="media-close" on:click={onClose}>Close</button>
+				<button type="button" class="media-close" on:click={closeOverlay}>Close</button>
 			</div>
 
 			<div class="media-body">
 				{#if media.kind === 'video' && media.embedSrc}
 					<!-- svelte-ignore a11y-media-has-caption -->
-					<video src={media.embedSrc} controls autoplay playsinline></video>
+					<video src={media.embedSrc} controls autoplay={!reducedMotion} playsinline></video>
 				{:else if media.embedSrc}
-					<iframe
+					<SandboxedEmbed
 						src={media.embedSrc}
 						title={media.title}
 						allow={media.allow || 'autoplay; encrypted-media; picture-in-picture; fullscreen'}
-						allowfullscreen
-						loading="lazy"
-						referrerpolicy="strict-origin-when-cross-origin"
-					></iframe>
+					/>
 				{:else}
 					<div class="media-fallback">
 						<p>This platform does not allow full in-app embedding for this link.</p>
@@ -106,7 +179,7 @@
 		background: #070c17;
 	}
 
-	.media-body iframe {
+	.media-body :global(iframe) {
 		width: 100%;
 		height: 100%;
 		border: 0;

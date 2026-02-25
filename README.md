@@ -52,6 +52,9 @@ Workflow file: `.github/workflows/cloudflare-pages.yml`
 - `SANITY_API_TOKEN` (required for write operations or live validation)
 - `BUNDLE_BUDGET_JS_BYTES` (optional, default: `650000`)
 - `BUNDLE_BUDGET_CSS_BYTES` (optional, default: `120000`)
+- `TURNSTILE_SECRET_KEY` (optional, enable Cloudflare Turnstile validation for contact form)
+- `TURNSTILE_ENFORCE` (optional, set to `true` to require a valid Turnstile token)
+- `PUBLIC_TURNSTILE_SITE_KEY` (optional, enables Turnstile widget on the contact form)
 
 ### Commands
 
@@ -63,6 +66,19 @@ Checks local portfolio documents for unknown keys and missing structural fields.
 
 - `npm run pipeline:visual-contract`
 Runs visual contract checks (critical UI markers must exist in core components).
+
+- `npm run pipeline:sitemap`
+Generates `static/sitemap.xml` from current portfolio data and project routes.
+
+### Project detail pages
+
+- SEO detail pages are generated at `/projects/music/:slug` and `/projects/programming/:slug`.
+- Category landing pages are generated at `/projects/music` and `/projects/programming`.
+- `static/sitemap.xml` includes all generated project URLs.
+
+### Search Console playbook
+
+- Follow the checklist in `docs/SEO_SEARCH_CONSOLE_CHECKLIST.md`.
 
 - `npm run pipeline:export`
 Export publishable projects from Sanity into `data.json` and `static/portfolio.json`.

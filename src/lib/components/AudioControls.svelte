@@ -52,6 +52,13 @@
         audioSystem.setParameter(name, value);
     }
 
+    async function handlePlayClick() {
+        if (!audioSystem.isInitialized) {
+            await audioSystem.init();
+        }
+        audioSystem.triggerTestNote();
+    }
+
     function startDrag(e, param, min, max) {
         e.preventDefault();
         e.stopPropagation();
@@ -130,7 +137,7 @@
         {#if isExpanded}
             <button
                 class="bg-black/40 backdrop-blur-md text-white/80 border border-white/20 rounded-full px-4 py-2 text-xs font-bold tracking-widest hover:bg-white/10 hover:text-[#FF0080] transition-all uppercase mb-2"
-                on:click|stopPropagation={() => audioSystem.triggerTestNote()}
+                on:click|stopPropagation={handlePlayClick}
             >
                 Play
             </button>

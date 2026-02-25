@@ -4,13 +4,14 @@
 	"private": true,
 	"scripts": {
 		"dev": "vite dev",
-		"build": "vite build",
+		"build": "node scripts/generateSitemap.mjs && vite build",
 		"preview": "vite preview",
 		"deploy": "gh-pages -d build -t",
 		"pipeline:validate": "node scripts/validatePortfolio.mjs",
 		"pipeline:schema-drift": "node scripts/checkSchemaDrift.mjs",
 		"pipeline:bundle-budget": "BUNDLE_BUDGET_JS_BYTES=760000 node scripts/checkBundleBudget.mjs",
-		"pipeline:visual-contract": "node scripts/checkVisualContract.mjs"
+		"pipeline:visual-contract": "node scripts/checkVisualContract.mjs",
+		"pipeline:sitemap": "node scripts/generateSitemap.mjs"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-static": "^3.0.10",
@@ -30,6 +31,7 @@
 		"@sanity/client": "^7.16.0",
 		"gh-pages": "^4.0.0",
 		"simplenoise": "^1.0.1",
-		"three": "^0.183.1"
+		"three": "^0.183.1",
+		"web-vitals": "^5.1.0"
 	}
 }

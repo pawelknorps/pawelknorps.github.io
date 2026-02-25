@@ -17,6 +17,74 @@ const texture = [
     loader.load(`${base}/photo8.webp`),
 ];
 
+const ABOUT_TEXT_LINES = [
+    'Pawel Knorps - artysta poruszajacy sie miedzy tradycja a eksploracja, oddany dzwiekowi jako sile przekraczajacej granice. Absolwent gitary jazzowej poznanskiej Akademii Muzycznej oraz kompozycji jazzowej na dunskiej Danish National Academy of Music w Odense.',
+    'Jego muzyczna podroz jest skupiona wokol improwizacji - nie tylko na gitarze, ale rowniez jako basista, producent i kompozytor. Pawel poszukuje w muzyce przestrzeni wolnosci, miejsca, gdzie intuicja spotyka sie z ryzykiem, a dzwiek przeistacza sie w narracje.',
+    'Jego zespol Pawel Knorps Group, tworzony z wybitnymi poznanskimi muzykami, to swiadectwo tej wizji - jazzowy dialog, wyrastajacy z lat doswiadczen muzycznych, ekspresji i otwartosci. Projekt ten zdobyl uznanie w finale Blue Note Competition 2024.',
+    'Jego alter ego - enthymeme - to swiat elektronicznej improwizacji. W dzwiekach klubow takich jak Farby czy Dom Technika tworzy on pejzaze z pogranicza chaosu i struktury, gdzie technologia spotyka sie z ludzkim dotykiem.',
+    'Dzis, po powrocie z Danii, Pawel zasila poznanskie projekty - od delikatnych brzmien Milomi, przez senne marzenia SNY, folkowo-djentowe eksploracje kolektywu Przesilenie, world-music z GanaVana, po alternatywne i orientalne brzmienia Aktas Erdogan Trio.',
+    'Kazda z tych formacji jest przejawem niezaspokojonej ciekawosci w poszukiwaniu wlasnej ekspresji.'
+];
+
+const fallbackTextTexture = new THREE.DataTexture(
+    new Uint8Array([0, 0, 0, 0]),
+    1,
+    1,
+    THREE.RGBAFormat
+);
+fallbackTextTexture.needsUpdate = true;
+const fallbackVideoTexture = new THREE.DataTexture(
+    new Uint8Array([0, 0, 0, 255]),
+    1,
+    1,
+    THREE.RGBAFormat
+);
+fallbackVideoTexture.needsUpdate = true;
+const SRGB_COLOR_SPACE_KEY = 'SRGB' + 'ColorSpace';
+const srgbColorSpace = THREE[SRGB_COLOR_SPACE_KEY];
+
+const createAboutTextTexture = () => {
+    if (typeof document === 'undefined') {
+        return fallbackTextTexture;
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 2048;
+    canvas.height = 1024;
+    const ctx = canvas.getContext('2d');
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = 'rgba(5, 8, 16, 0.0)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+    gradient.addColorStop(0, 'rgba(214, 243, 255, 1)');
+    gradient.addColorStop(0.5, 'rgba(255, 255, 255, 1)');
+    gradient.addColorStop(1, 'rgba(228, 244, 255, 1)');
+
+    ctx.font = '700 30px "Space Grotesk", "Sora", sans-serif';
+    ctx.fillStyle = gradient;
+    ctx.textBaseline = 'top';
+    ctx.shadowColor = 'rgba(8, 16, 38, 0.95)';
+    ctx.shadowBlur = 10;
+
+    const lineHeight = 50;
+    let y = 24;
+    while (y < canvas.height + lineHeight) {
+        const line = ABOUT_TEXT_LINES[Math.floor((y / lineHeight) % ABOUT_TEXT_LINES.length)];
+        ctx.fillText(`${line}  //  `, 40, y);
+        y += lineHeight;
+    }
+
+    const textTexture = new THREE.CanvasTexture(canvas);
+    textTexture.wrapS = THREE.RepeatWrapping;
+    textTexture.wrapT = THREE.RepeatWrapping;
+    textTexture.minFilter = THREE.LinearFilter;
+    textTexture.magFilter = THREE.LinearFilter;
+    textTexture.needsUpdate = true;
+    return textTexture;
+};
+
 let Renderer;
 const SCENE = new THREE.Scene();
 let n = 0.2;
@@ -36,6 +104,10 @@ const morphShader = {
     uniforms: {
         tDiffuse1: { value: texture[0] },
         tDiffuse2: { value: texture[1] },
+        tAboutText: { value: fallbackTextTexture },
+        tVideo: { value: fallbackVideoTexture },
+        videoMix: { value: 0 },
+        aboutTextIntensity: { value: 0 },
         morphFactor: { value: n },
         time: { value: 0}
     },
@@ -127,7 +199,12 @@ const morphShader = {
     fragmentShader: `
         uniform sampler2D tDiffuse1;
         uniform sampler2D tDiffuse2;
+        uniform sampler2D tAboutText;
+        uniform sampler2D tVideo;
+        uniform float videoMix;
+        uniform float aboutTextIntensity;
         uniform float morphFactor;
+        uniform float time;
         varying vec2 vUv;
 
         void main() {
@@ -135,7 +212,28 @@ const morphShader = {
             vec2 shiftedUv = fract(vUv + offset); 
             vec4 color1 = texture2D(tDiffuse1, shiftedUv);
             vec4 color2 = texture2D(tDiffuse2, shiftedUv);
-            gl_FragColor = mix(color1, color2, morphFactor);
+            vec4 baseColor = mix(color1, color2, morphFactor);
+
+            vec2 textUv = vec2(
+                fract(vUv.x * 1.2 + time * 0.018),
+                fract(vUv.y * 2.0 - time * 0.012)
+            );
+            vec4 textColor = texture2D(tAboutText, textUv);
+            float textMask = smoothstep(0.08, 0.9, textColor.a) * aboutTextIntensity;
+
+            float pulse = 0.6 + 0.4 * sin(time * 2.2 + vUv.y * 8.0);
+            vec3 hologram = mix(vec3(0.78, 0.92, 1.0), vec3(1.0, 1.0, 1.0), pulse);
+
+            float scanline = 0.96 + 0.04 * sin((vUv.y + time * 0.08) * 320.0);
+            vec3 projected = baseColor.rgb + hologram * textMask * 0.95;
+            vec3 finalColor = mix(baseColor.rgb, projected, textMask) * scanline;
+
+            vec2 videoUv = vec2(fract(vUv.x + time * 0.006), 1.0 - vUv.y);
+            vec3 videoColor = texture2D(tVideo, videoUv).rgb;
+            float videoMask = smoothstep(0.12, 0.92, videoMix);
+            finalColor = mix(finalColor, mix(finalColor, videoColor, 0.92), videoMask);
+
+            gl_FragColor = vec4(finalColor, baseColor.a);
         }
     `
 };
@@ -163,9 +261,14 @@ let z = 5;
 let m = 0.2;
 let CAMERA = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, m, z);
 CAMERA.position.z = 2.2;
+const baseCameraFov = 75;
+const focusCameraFov = 56;
+const baseSphereScale = 1.3;
+const focusSphereScale = 1.72;
 
 const projectPoints = new THREE.Group();
 SCENE.add(projectPoints);
+let bioSpacePlane = null;
 
 // Store projects data globally to be set from Svelte
 let allProjects = [];
@@ -175,6 +278,7 @@ const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 let INTERSECTED = null;
 let interactionObjects = [];
+let projectOpenHandler = null;
 
 // Set audio system reference
 export const setAudioSystem = (system) => {
@@ -531,6 +635,15 @@ const morphDelay = 2000;
 let lastMorphTime = 20;
 let scrollPosition = 0;
 let lastMorphSoundTime = 0;
+let aboutTextTexture = null;
+let aboutProjectionTarget = 0;
+let aboutProjectionCurrent = 0;
+let bioFocusTarget = 0;
+let bioFocusCurrent = 0;
+let projectedVideoMixTarget = 0;
+let projectedVideoMixCurrent = 0;
+let projectedVideoEl = null;
+let projectedVideoTexture = null;
 
 // Scroll tracking
 const updateScrollPosition = () => {
@@ -550,6 +663,22 @@ const animate = async () => {
     SPHERE.material.uniforms.time.value = now * 0.00001;
 
     const uniforms = SPHERE.material.uniforms;
+    aboutProjectionCurrent += (aboutProjectionTarget - aboutProjectionCurrent) * 0.06;
+    uniforms.aboutTextIntensity.value = aboutProjectionCurrent;
+    projectedVideoMixCurrent += (projectedVideoMixTarget - projectedVideoMixCurrent) * 0.06;
+    uniforms.videoMix.value = projectedVideoMixCurrent;
+    bioFocusCurrent += (bioFocusTarget - bioFocusCurrent) * 0.05;
+
+    const targetCameraZ = 2.2 - bioFocusCurrent * 0.9;
+    CAMERA.position.z += (targetCameraZ - CAMERA.position.z) * 0.08;
+    const nextFov = baseCameraFov - (baseCameraFov - focusCameraFov) * bioFocusCurrent;
+    if (Math.abs(CAMERA.fov - nextFov) > 0.001) {
+        CAMERA.fov = nextFov;
+        CAMERA.updateProjectionMatrix();
+    }
+
+    const sphereScale = baseSphereScale + (focusSphereScale - baseSphereScale) * bioFocusCurrent;
+    SPHERE.scale.set(sphereScale, sphereScale, sphereScale);
 
     // Handle morphing with scroll-based speed
     if (!morphing && now - lastMorphTime > morphDelay) {
@@ -590,11 +719,24 @@ const animate = async () => {
     projectPoints.rotation.x = sphereRotation.x + autoRotationX;
     projectPoints.rotation.y = sphereRotation.y + autoRotationY;
 
+    if (bioSpacePlane) {
+        bioSpacePlane.material.opacity = bioFocusCurrent * 0.9;
+        bioSpacePlane.rotation.z += 0.0004 + bioFocusCurrent * 0.0008;
+        bioSpacePlane.material.map.offset.x += 0.0001 + bioFocusCurrent * 0.0005;
+        bioSpacePlane.material.map.offset.y -= 0.00005 + bioFocusCurrent * 0.0002;
+        bioSpacePlane.position.z = -1.8 - bioFocusCurrent * 0.9;
+    }
+
     z = scrollPosition/60+2;
     m = scrollPosition/5929+0.01;
     n = z-2;
      
+    const projectPointsVisible = bioFocusCurrent < 0.92;
+    projectPoints.visible = projectPointsVisible;
+    projectPoints.scale.setScalar(1 - bioFocusCurrent * 0.3);
+
     // Update particle animations
+    if (projectPointsVisible) {
     projectPoints.children.forEach(pointGroup => {
         const userData = pointGroup.userData;
         const material = userData.particleMaterial;
@@ -624,6 +766,7 @@ const animate = async () => {
             material.uniforms.destructionFactor.value = userData.destructionFactor;
         }
     });
+    }
 
     if (Renderer) {
         Renderer.render(SCENE, CAMERA);
@@ -768,6 +911,13 @@ const handleProjectClick = (event) => {
         // Play click sound
         audioSystem.playClickSound();
         console.log('Project clicked:', project.id);
+
+        if (projectOpenHandler) {
+            const wasHandled = projectOpenHandler(project);
+            if (wasHandled) {
+                return;
+            }
+        }
         
         
         
@@ -831,6 +981,28 @@ const onTouchEnd = (event) => {
 export const setScene = async (canvas) => {
     Renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
     Renderer.setClearColor("#000000");
+    if ('outputColorSpace' in Renderer && srgbColorSpace) {
+        Renderer.outputColorSpace = srgbColorSpace;
+    } else if ('outputEncoding' in Renderer && THREE.sRGBEncoding) {
+        Renderer.outputEncoding = THREE.sRGBEncoding;
+    }
+
+    if (!aboutTextTexture) {
+        aboutTextTexture = createAboutTextTexture();
+        SPHERE.material.uniforms.tAboutText.value = aboutTextTexture;
+        const planeMaterial = new THREE.MeshBasicMaterial({
+            map: aboutTextTexture,
+            transparent: true,
+            opacity: 0,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+        });
+        planeMaterial.map.repeat.set(1.5, 1.9);
+        bioSpacePlane = new THREE.Mesh(new THREE.PlaneGeometry(12, 7.5), planeMaterial);
+        bioSpacePlane.position.set(0, 0, -1.8);
+        SCENE.add(bioSpacePlane);
+    }
+    SPHERE.material.uniforms.aboutTextIntensity.value = aboutProjectionCurrent;
     
     canvas.style.cursor = 'grab';
     
@@ -855,4 +1027,61 @@ export const setScene = async (canvas) => {
     
     await resize();
     await animate();
+};
+
+export const setBioProjectionEnabled = (enabled) => {
+    bioFocusTarget = enabled ? 1 : 0;
+    aboutProjectionTarget = enabled ? 1 : 0;
+    if (!enabled) {
+        projectedVideoMixTarget = 0;
+    }
+};
+
+export const setProjectOpenHandler = (handler) => {
+    projectOpenHandler = typeof handler === 'function' ? handler : null;
+};
+
+export const setProjectedVideo = async (url) => {
+    if (!url) return false;
+    try {
+        if (!projectedVideoEl) {
+            projectedVideoEl = document.createElement('video');
+            projectedVideoEl.crossOrigin = 'anonymous';
+            projectedVideoEl.muted = true;
+            projectedVideoEl.loop = true;
+            projectedVideoEl.playsInline = true;
+        }
+        if (projectedVideoEl.src !== url) {
+            projectedVideoEl.src = url;
+            projectedVideoEl.load();
+        }
+        await projectedVideoEl.play();
+        if (!projectedVideoTexture) {
+            projectedVideoTexture = new THREE.VideoTexture(projectedVideoEl);
+            projectedVideoTexture.minFilter = THREE.LinearFilter;
+            projectedVideoTexture.magFilter = THREE.LinearFilter;
+            projectedVideoTexture.format = THREE.RGBFormat;
+            if ('colorSpace' in projectedVideoTexture && srgbColorSpace) {
+                projectedVideoTexture.colorSpace = srgbColorSpace;
+            } else if ('encoding' in projectedVideoTexture && THREE.sRGBEncoding) {
+                projectedVideoTexture.encoding = THREE.sRGBEncoding;
+            }
+        }
+        SPHERE.material.uniforms.tVideo.value = projectedVideoTexture;
+        projectedVideoMixTarget = 1;
+        return true;
+    } catch (error) {
+        console.warn('Projected video start failed:', error);
+        return false;
+    }
+};
+
+export const clearProjectedVideo = () => {
+    projectedVideoMixTarget = 0;
+    SPHERE.material.uniforms.tVideo.value = fallbackVideoTexture;
+    if (projectedVideoEl) {
+        projectedVideoEl.pause();
+        projectedVideoEl.removeAttribute('src');
+        projectedVideoEl.load();
+    }
 };

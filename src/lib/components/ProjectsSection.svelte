@@ -1,10 +1,22 @@
 <script>
+	import { createEventDispatcher } from 'svelte';
 	import { fade } from "svelte/transition";
+	import { resolveProjectMedia } from '$lib/utils/projectMedia.js';
 	
 	export let musicProjects;
 	export let programmingProjects;
 	export let adaptiveTextClass;
 	export let adaptiveSubTextClass;
+
+	const dispatch = createEventDispatcher();
+
+	const openInApp = (event, project, type) => {
+		const media = resolveProjectMedia(project);
+		const url = media.url;
+		if (!url || media.provider !== 'youtube') return;
+		event.preventDefault();
+		dispatch('openProjectMedia', { ...project, type, mediaUrl: url });
+	};
 </script>
 
 <!-- Music Projects -->
@@ -23,6 +35,7 @@
 						href={data.links.youtube || data.links.bandcamp || data.links.soundcloud || data.links.facebook}
 						rel="noopener noreferrer"
 						target="_blank"
+						on:click={(event) => openInApp(event, data, 'music')}
 						class="block h-auto px-0 py-0 tracking-widest transition-all duration-300 transform hover:scale-[1.02] cursor-pointer"
 						>
 						<h2 class="text-xl font-black mb-4 hover:text-[#FF0080] transition-colors duration-300 adaptive-text"
@@ -78,7 +91,7 @@
 		{#each programmingProjects as data, i}
 			<div id="programming-{i}" class="group my-20 translate-y-0 hover:-translate-y-8 duration-[400ms] ease-in-out w-[20rem] md:w-[40rem] lg:w-[30rem] xl:w-[40rem] project-card pointer-events-auto" in:fade={{ delay: 250 * (i + musicProjects.length), duration: 1000 }}>
 				{#if data.github || data.demo}
-					<a href={data.github || data.demo} rel="noopener noreferrer" target="_blank" class="block h-auto px-0 py-0 tracking-widest transition-all duration-300 transform hover:scale-[1.02] cursor-pointer">
+					<a href={data.github || data.demo} rel="noopener noreferrer" target="_blank" on:click={(event) => openInApp(event, data, 'programming')} class="block h-auto px-0 py-0 tracking-widest transition-all duration-300 transform hover:scale-[1.02] cursor-pointer">
 						<h2 class="text-xl font-black mb-4 hover:text-[#FF0080] transition-colors duration-300 adaptive-text"
 							class:text-white={adaptiveTextClass === 'text-white'}
 							class:text-gray-900={adaptiveTextClass === 'text-gray-900'}>

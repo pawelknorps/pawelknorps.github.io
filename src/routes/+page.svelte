@@ -17,20 +17,16 @@
 </svelte:head>
 <script>
 	// Library Imports
-	import { base } from '$app/paths';
-	import { setScene, updateProjects, setAudioSystem } from '$lib/ThreeObject.js';
-	import { fade } from "svelte/transition";
+	import { setScene, updateProjects, setBioProjectionEnabled, setProjectOpenHandler, setProjectedVideo, clearProjectedVideo } from '$lib/ThreeObject.js';
 	import { onMount, tick } from 'svelte';
-	import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 	
 	// Import components
 	import HeroSection from '$lib/components/HeroSection.svelte';
 	import SocialBubbles from '$lib/components/SocialBubbles.svelte';
 	import ProjectsSection from '$lib/components/ProjectsSection.svelte';
 	import BiographicalSection from '$lib/components/BiographicalSection.svelte';
-	
-	// Import audio system
-	import { audioSystem } from '$lib/AudioSystem.js';
+	import ProjectMediaOverlay from '$lib/components/ProjectMediaOverlay.svelte';
+	import { resolveProjectMedia } from '$lib/utils/projectMedia.js';
 	
 
 	// 🚀 Ta zmienna przychodzi z load()
@@ -56,9 +52,46 @@
 	let adaptiveTextClass = 'text-white';
 	let adaptiveSubTextClass = 'text-gray-300';
 
-	// Breakpoint for bio visibility
-	$: showBio = innerWidth >= 1300; // Show bio only on xl screens and larger
+	let bioFocusEnabled = false;
+	let activeMedia = null;
+	$: showBio = innerWidth >= 1300;
 	$: projectsHeight = 0;
+
+	const syncSceneFocus = () => {
+		setBioProjectionEnabled(bioFocusEnabled || !!activeMedia);
+	};
+
+	const openProjectMedia = (project) => {
+		const media = resolveProjectMedia(project);
+		const url = media.url;
+		if (!url || url === '#' || media.provider !== 'youtube') return false;
+
+		// Real sphere projection requires direct video files (mp4/webm/ogg).
+		// YouTube URLs can only be shown in iframe fallback unless pipeline provides projectionVideo.
+		if (media.projectionVideo) {
+			setProjectedVideo(media.projectionVideo);
+			activeMedia = null;
+			syncSceneFocus();
+			return true;
+		}
+
+		activeMedia = {
+			title: project.title || 'Project media',
+			subtitle: project.type || project.year || media.provider || 'media',
+			url,
+			kind: media.kind,
+			embedSrc: media.embedSrc,
+			allow: media.allow
+		};
+		syncSceneFocus();
+		return true;
+	};
+
+	const closeProjectMedia = () => {
+		activeMedia = null;
+		clearProjectedVideo();
+		syncSceneFocus();
+	};
 	
 	// Function to sample canvas brightness
 	function sampleCanvasBrightness() {
@@ -146,10 +179,7 @@
 			}
 			
 			// Start brightness sampling
-			// In your page.svelte script
-
 			let frameCount = 0;
-			let brightnessInterval; // We'll keep this name for the handle
 
 			function startBrightnessSampling() {
 				function sampleLoop() {
@@ -167,11 +197,8 @@
 				cancelAnimationFrame(brightnessInterval);
 			}
 
-			// In loadAndInitializeScene() function, replace setInterval:
-			// brightnessInterval = setInterval(sampleCanvasBrightness, 200); // <-- REMOVE
-			startBrightnessSampling(); // <-- ADD
+			startBrightnessSampling();
 
-			// In your onMount's return function (cleanup):
 			return () => {
 				stopBrightnessSampling();
 			};
@@ -215,13 +242,15 @@
 				console.error('Canvas element not available');
 			}
 		}, 100);
+
+		setProjectOpenHandler((project) => openProjectMedia(project));
 		
-		// Cleanup function
-		return () => {
-			if (brightnessInterval) {
-				clearInterval(brightnessInterval);
-			}
-		};
+			// Cleanup function
+			return () => {
+				if (brightnessInterval) {
+					cancelAnimationFrame(brightnessInterval);
+				}
+			};
     });
 		
 	// Add a manual initialization trigger for debugging
@@ -234,6 +263,20 @@
 		isAudioEnabled = true;
 	};
 
+	const handleToggleBioFocus = () => {
+		bioFocusEnabled = !bioFocusEnabled;
+		if (!bioFocusEnabled) {
+			clearProjectedVideo();
+			activeMedia = null;
+		}
+		syncSceneFocus();
+	};
+
+	const handleToggleBioProjection = () => {
+		bioFocusEnabled = !bioFocusEnabled;
+		syncSceneFocus();
+	};
+
 </script>
 
 <svelte:window bind:scrollY bind:innerHeight bind:innerWidth />
@@ -242,9 +285,9 @@
 	{/if}
 
 	<canvas  
-		bind:this={ThreeObject}  
-		on:click={handleCanvasClick}
-		class="fixed top-0 left-0 w-full h-full cursor-grab transition-opacity duration-1000"
+			bind:this={ThreeObject}  
+			on:click={handleCanvasClick}
+			class="fixed top-0 left-0 w-full h-full cursor-grab transition-opacity duration-1000"
 		style:opacity={sceneReady ? 1 : 0} 
 		style:pointer-events={sceneReady ? 'auto' : 'none'} 
 		style:z-index={0}
@@ -252,16 +295,9 @@
 <!-- Simple audio enable notice - top center -->
 {#if sceneInitialized && !isAudioEnabled}
 <div class="audio-notice fixed top-6 left-1/2 transform -translate-x-1/2 z-50 bg-black/80 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm border border-white/20 transition-all duration-300">
-	 touch the sphere for audio
+		 touch the sphere for audio
 </div>
 {/if}
-
-<canvas 
-	bind:this={ThreeObject} 
-	on:click={handleCanvasClick}
-	class="fixed top-0 left-0 w-full h-full cursor-grab"
-	style="pointer-events: auto; z-index: 0;"
-></canvas>
 
 <SocialBubbles />
 
@@ -271,40 +307,45 @@
 		{personalData} 
 		{adaptiveTextClass} 
 		{adaptiveSubTextClass} 
+		{bioFocusEnabled}
+		on:toggleBioFocus={handleToggleBioFocus}
 	/>
 <!-- Projects naturally flowing from bottom of page with biographical text -->
-	<div class="projects-flow relative px-4 sm:px-6 md:px-8 xl:px-16 2xl:px-24">
-	<!-- Centered column on mobile, row on xl+ -->
-	<div class="flex flex-col items-center xl:items-start xl:flex-row gap-16 2xl:gap-24">
-		
-		<!-- Left side - Projects -->
-		<div
-		class="projects-container w-full max-w-3xl xl:max-w-none xl:w-1/2"
-		bind:clientHeight={projectsHeight}
-		>
-		<ProjectsSection 
-			{musicProjects}
+		<div class="projects-flow relative px-4 sm:px-6 md:px-8 xl:px-16 2xl:px-24">
+		<div class="flex flex-col items-center xl:items-start xl:flex-row gap-16 2xl:gap-24">
+			
+			<!-- Left side - Projects -->
+			<div
+			class="projects-container w-full max-w-3xl xl:max-w-none xl:w-1/2"
+			bind:clientHeight={projectsHeight}
+			>
+			<ProjectsSection 
+				{musicProjects}
 			{programmingProjects}
 			{adaptiveTextClass}
 			{adaptiveSubTextClass}
-		/>
+			on:openProjectMedia={(event) => openProjectMedia(event.detail)}
+			/>
+			</div>
+
+			{#if showBio}
+			<div class="w-full max-w-3xl xl:max-w-none xl:w-1/2 2xl:w-2/3 mt-12 xl:mt-0">
+				<BiographicalSection
+					{scrollY}
+					{innerHeight}
+					{projectsHeight}
+					{adaptiveTextClass}
+					{adaptiveSubTextClass}
+					bioProjectionEnabled={bioFocusEnabled}
+					on:toggleBioProjection={handleToggleBioProjection}
+				/>
+			</div>
+			{/if}
+		</div>
+		</div>
 		</div>
 
-		<!-- Right side - Biographical text -->
-		{#if showBio}
-		<div class="w-full max-w-3xl xl:max-w-none xl:w-1/2 2xl:w-2/3 mt-12 xl:mt-0">
-			<BiographicalSection 
-			{scrollY}
-			{innerHeight}
-			{projectsHeight}
-			{adaptiveTextClass}
-			{adaptiveSubTextClass}
-			/>
-		</div>
-		{/if}
-	</div>
-	</div>
-	</div>
+<ProjectMediaOverlay media={activeMedia} onClose={closeProjectMedia} />
 
 
 <!-- Debug info (remove in production) -->
@@ -325,7 +366,7 @@
 		background: transparent;
 		position: relative;
 		z-index: 10; /* Higher z-index for content */
-		pointer-events: none; /* Allow clicks to pass through to canvas */
+		pointer-events: auto;
 	}
 
 	/* Projects flow seamlessly */
@@ -333,7 +374,7 @@
 		background: transparent;
 		position: relative;
 		z-index: 15;
-		pointer-events: none; /* Re-enable pointer events for content */
+		pointer-events: auto;
 	}
 
 	/* By default, let Three.js control all gestures */

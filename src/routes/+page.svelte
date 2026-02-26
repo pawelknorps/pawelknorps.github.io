@@ -48,10 +48,13 @@
 		immersiveApi || {
 			setScene: async () => {},
 			updateProjects: noOp,
+			setCanvasSubtitles: noOp,
 			setBioProjectionEnabled: noOp,
 			setProjectOpenHandler: noOp,
 			setProjectedVideo: noOp,
+			setProjectedMediaStream: async () => false,
 			clearProjectedVideo: noOp,
+			clearProjectedMediaStream: noOp,
 			destroyScene: noOp
 		};
 	// Project data
@@ -71,6 +74,10 @@
 
 	let bioFocusEnabled = false;
 	let activeMedia = null;
+	let projectMediaActive = false;
+	let webcamEnabled = false;
+	let webcamLoading = false;
+	let webcamError = '';
 	let speechVoices = [];
 	let selectedNarrationVoice = null;
 	let reducedMotion = false;
@@ -118,10 +125,13 @@
 		immersiveApi = {
 			setScene: module.setScene,
 			updateProjects: module.updateProjects,
+			setCanvasSubtitles: module.setCanvasSubtitles,
 			setBioProjectionEnabled: module.setBioProjectionEnabled,
 			setProjectOpenHandler: module.setProjectOpenHandler,
 			setProjectedVideo: module.setProjectedVideo,
+			setProjectedMediaStream: module.setProjectedMediaStream,
 			clearProjectedVideo: module.clearProjectedVideo,
+			clearProjectedMediaStream: module.clearProjectedMediaStream,
 			destroyScene: module.destroyScene
 		};
 		return immersiveApi;
@@ -141,14 +151,43 @@
 	const syncSceneFocus = () => {
 		getImmersiveApi().setBioProjectionEnabled(bioFocusEnabled || contactFocusEnabled || !!activeMedia);
 	};
+	const getRoleSubtitle = () =>
+		(personalData?.title && String(personalData.title).trim()) ||
+		'Composer, Bassist, Producer and guitarist.';
+	const syncCanvasSubtitles = () => {
+		getImmersiveApi().setCanvasSubtitles({
+			roleText: getRoleSubtitle(),
+			musicText: '// MUSIC'
+		});
+	};
+	const syncGenerativeSuppression = () => {
+		audioSystem.setGenerativeSuppressed?.(projectMediaActive);
+	};
 	$: if (sceneInitialized) {
 		syncSceneFocus();
+		syncCanvasSubtitles();
 	}
 
 	const openProjectMedia = (project) => {
 		const media = resolveProjectMedia(project);
 		const url = media.url;
 		if (!url || url === '#' || media.provider !== 'youtube') return false;
+		projectMediaActive = true;
+		syncGenerativeSuppression();
+
+		// Webcam has precedence over project projection while enabled.
+		if (webcamEnabled) {
+			activeMedia = {
+				title: project.title || 'Project media',
+				subtitle: project.type || project.year || media.provider || 'media',
+				url,
+				kind: media.kind,
+				embedSrc: withAutoplay(media.embedSrc, !reducedMotion),
+				allow: media.allow
+			};
+			syncSceneFocus();
+			return true;
+		}
 
 		// Real sphere projection requires direct video files (mp4/webm/ogg).
 		// YouTube URLs can only be shown in iframe fallback unless pipeline provides projectionVideo.
@@ -172,9 +211,77 @@
 	};
 
 	const closeProjectMedia = () => {
+		projectMediaActive = false;
+		syncGenerativeSuppression();
 		activeMedia = null;
-		getImmersiveApi().clearProjectedVideo();
+		if (!webcamEnabled) {
+			getImmersiveApi().clearProjectedVideo();
+		}
 		syncSceneFocus();
+	};
+
+	const startWebcamProjection = async () => {
+		if (webcamLoading || webcamEnabled) return;
+		webcamError = '';
+		webcamLoading = true;
+		try {
+			if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+				throw new Error('Webcam is only available in the browser.');
+			}
+			if (!window.isSecureContext) {
+				throw new Error('Webcam requires a secure context (HTTPS).');
+			}
+			if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+				throw new Error('This browser does not support webcam access.');
+			}
+			const stream = await navigator.mediaDevices.getUserMedia({
+				video: { facingMode: 'user' },
+				audio: false
+			});
+			await ensureImmersiveApi();
+			const ok = await getImmersiveApi().setProjectedMediaStream(stream);
+			if (!ok) {
+				stream.getTracks().forEach((track) => track.stop());
+				throw new Error('Failed to project webcam stream.');
+			}
+			projectMediaActive = false;
+			syncGenerativeSuppression();
+			activeMedia = null;
+			webcamEnabled = true;
+			syncSceneFocus();
+		} catch (error) {
+			const cameraErrorName = error?.name || '';
+			if (cameraErrorName === 'NotAllowedError' || cameraErrorName === 'SecurityError') {
+				webcamError = 'Camera permission denied. Please allow access and try again.';
+			} else if (cameraErrorName === 'NotFoundError' || cameraErrorName === 'OverconstrainedError') {
+				webcamError = 'No compatible camera found on this device.';
+			} else if (cameraErrorName === 'NotReadableError') {
+				webcamError = 'Camera is currently in use by another app.';
+			} else {
+				webcamError = error?.message || 'Could not start webcam projection.';
+			}
+			webcamEnabled = false;
+			getImmersiveApi().clearProjectedMediaStream();
+			syncSceneFocus();
+		} finally {
+			webcamLoading = false;
+		}
+	};
+
+	const stopWebcamProjection = () => {
+		getImmersiveApi().clearProjectedMediaStream();
+		webcamEnabled = false;
+		webcamLoading = false;
+		webcamError = '';
+		syncSceneFocus();
+	};
+
+	const handleToggleWebcamProjection = async () => {
+		if (webcamEnabled) {
+			stopWebcamProjection();
+			return;
+		}
+		await startWebcamProjection();
 	};
 
 	const preloadAudioControls = async () => {
@@ -306,6 +413,7 @@
 				// Initialize the scene
 				await ensureImmersiveApi();
 				await getImmersiveApi().setScene(ThreeObject);
+					syncCanvasSubtitles();
 					getImmersiveApi().setProjectOpenHandler((project) => openProjectMedia(project));
 					sceneInitialized = true;
 					sceneReady = true;
@@ -437,6 +545,9 @@
 			brightnessInterval = null;
 		}
 		stopBioNarration();
+		stopWebcamProjection();
+		projectMediaActive = false;
+		syncGenerativeSuppression();
 		getImmersiveApi().destroyScene();
 	});
 		
@@ -452,8 +563,12 @@
 
 	const handleToggleBioFocus = () => {
 		bioFocusEnabled = !bioFocusEnabled;
-		getImmersiveApi().clearProjectedVideo();
+		if (!webcamEnabled) {
+			getImmersiveApi().clearProjectedVideo();
+		}
 		if (bioFocusEnabled) {
+			projectMediaActive = false;
+			syncGenerativeSuppression();
 			activeMedia = null;
 			void startBioNarration();
 		} else {
@@ -533,7 +648,13 @@
 
 <SocialBubbles />
 {#if AudioControlsComponent}
-	<svelte:component this={AudioControlsComponent} />
+	<svelte:component
+		this={AudioControlsComponent}
+		{webcamEnabled}
+		{webcamLoading}
+		{webcamError}
+		on:toggleWebcamProjection={handleToggleWebcamProjection}
+	/>
 {/if}
 
 <!-- Seamless flowing content -->
@@ -552,7 +673,7 @@
 			
 			<!-- Left side - Projects -->
 			<div
-			class="projects-container w-full max-w-3xl xl:max-w-none xl:w-1/2 2xl:w-3/5"
+			class="projects-container w-full max-w-4xl xl:max-w-none xl:w-7/12 2xl:w-3/5"
 			bind:clientHeight={projectsHeight}
 			>
 			<ProjectsSection 
@@ -564,7 +685,7 @@
 			/>
 			</div>
 
-			<div class="w-full max-w-3xl xl:max-w-none xl:w-1/2 2xl:w-2/5 mt-12 xl:mt-0">
+			<div class="hidden xl:block w-full max-w-3xl xl:max-w-none xl:w-5/12 2xl:w-2/5 mt-12 xl:mt-0">
 				<BiographicalSection
 					{scrollY}
 					{innerHeight}

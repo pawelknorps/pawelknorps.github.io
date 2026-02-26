@@ -25,11 +25,6 @@
 			class:text-gray-900={adaptiveTextClass === 'text-gray-900'}>
 			{personalData?.name || 'Paweł Knorps'}
 		</button>
-		<h2 class="text-2xl xl:text-3xl 2xl:text-4xl font-thin tracking-widest mt-6 ml-20 adaptive-text"
-			class:text-white={adaptiveTextClass === 'text-white'}
-			class:text-gray-900={adaptiveTextClass === 'text-gray-900'}>
-			&nbsp;{personalData?.title || 'Composer, Bassist, Producer'} and <mark id="revelation" style="background: none; color: #FF0080;" class="font-black">guitarist.</mark>
-		</h2>
 		<h2
 			class="text-2xl xl:text-3xl 2xl:text-4xl font-thin tracking-widest mt-6 text-center md:text-left md:ml-20 adaptive-text"
 			class:text-white={adaptiveTextClass === "text-white"}
@@ -41,34 +36,6 @@
 </div>
 
 <style>
-	#revelation {
-		animation: rainbow 6s infinite;
-	}
-
-	@keyframes rainbow {
-		0% {
-			color: #ff0080;
-		}
-		15% {
-			color: #ff00aa;
-		}
-		30% {
-			color: #ff00ea;
-		}
-		45% {
-			color: #ea00ff;
-		}
-		60% {
-			color: #ff00c8;
-		}
-		75% {
-			color: #ff009d;
-		}
-		100% {
-			color: #ff008c;
-		}
-	}
-
 	/* Hero section styling */
 	.hero-section {
 		background: transparent;
@@ -134,4 +101,5 @@
 				rgba(110, 200, 255, calc(0.28 + var(--audio-intensity) * 0.42)),
 			0 2px 2px rgba(0, 0, 0, 0.56);
 	}
+
 </style>

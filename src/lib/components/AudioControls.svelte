@@ -1,12 +1,21 @@
 <script>
     import { audioSystem } from "$lib/AudioSystem.js";
     import { onMount } from "svelte";
+    import { createEventDispatcher } from "svelte";
     import { fade, fly } from "svelte/transition";
+    
+    export let webcamEnabled = false;
+    export let webcamLoading = false;
+    export let webcamError = "";
+
+    const dispatch = createEventDispatcher();
+
+    const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
     let visible = false;
-    let isExpanded = false; // Collapsed by default on mobile
+    let isExpanded = false;
 
-    // Parameter values (defaults)
+    // Existing RNBO params
     let windowMs = 100;
     let chorus = 20;
     let delayMs = 200;
@@ -17,8 +26,31 @@
     let octdamp = 20;
     let octvol = 60;
 
-    // Drag state
-    let draggingParam = null;
+    // Generative controls
+    let generativeEnabled = true;
+    let keyLocked = false;
+    let autonomy = 56;
+    let density = 34;
+    let response = 62;
+    let mood = 58;
+    let tempoBias = 50;
+    let detectedLabel = "C dorian";
+    let bpmLabel = 86;
+    let modeState = "idle";
+
+    let stateInterval;
+
+    const rnboSliders = [
+        { id: "window", label: "Window", value: () => windowMs, min: 1, max: 1000 },
+        { id: "chorus", label: "Chorus", value: () => chorus, min: 0, max: 100 },
+        { id: "delay", label: "Delay", value: () => delayMs, min: 0, max: 2000 },
+        { id: "feedback", label: "Feedback", value: () => feedback, min: 0, max: 95 },
+        { id: "mix", label: "Mix", value: () => mix, min: 0, max: 100 },
+        { id: "pitchvol", label: "Pitch Vol", value: () => pitchvol, min: 0, max: 100 },
+        { id: "revvol", label: "Reverb Vol", value: () => revvol, min: 0, max: 100 },
+        { id: "octdamp", label: "Oct Damp", value: () => octdamp, min: 0, max: 100 },
+        { id: "octvol", label: "Oct Vol", value: () => octvol, min: 0, max: 100 }
+    ];
 
     onMount(() => {
         const profile = audioSystem.getUserSoundProfile?.() || {};
@@ -32,24 +64,45 @@
         octdamp = Number(profile.octdamp ?? octdamp);
         octvol = Number(profile.octvol ?? octvol);
 
-        // Fade in controls after a delay
+        refreshGenerativeState();
         setTimeout(() => (visible = true), 1000);
 
-        window.addEventListener("mousemove", onMouseMove);
-        window.addEventListener("mouseup", onMouseUp);
-        window.addEventListener("touchmove", onTouchMove, { passive: false });
-        window.addEventListener("touchend", onMouseUp);
+        stateInterval = setInterval(refreshGenerativeState, 220);
 
         return () => {
-            window.removeEventListener("mousemove", onMouseMove);
-            window.removeEventListener("mouseup", onMouseUp);
-            window.removeEventListener("touchmove", onTouchMove);
-            window.removeEventListener("touchend", onMouseUp);
+            if (stateInterval) {
+                clearInterval(stateInterval);
+                stateInterval = null;
+            }
         };
     });
 
+    function refreshGenerativeState() {
+        const state = audioSystem.getGenerativeState?.();
+        if (!state) return;
+
+        generativeEnabled = !!state.enabled;
+        keyLocked = !!state.keyLocked;
+        autonomy = Math.round((state.autonomy ?? 0.56) * 100);
+        density = Math.round((state.density ?? 0.34) * 100);
+        response = Math.round((state.response ?? 0.62) * 100);
+        mood = Math.round((state.mood ?? 0.58) * 100);
+        tempoBias = Math.round((state.tempoBias ?? 0.5) * 100);
+
+        const root = Number.isFinite(state.keyRoot) ? ((state.keyRoot % 12) + 12) % 12 : 0;
+        const mode = state.mode || "dorian";
+        detectedLabel = `${NOTE_NAMES[root]} ${mode}`;
+        bpmLabel = state.bpm || 86;
+        modeState = state.modeState || "idle";
+    }
+
     function updateParam(name, value) {
         audioSystem.setParameter(name, value);
+    }
+
+    function updateMacro(name, uiValue) {
+        const normalized = Math.max(0, Math.min(1, Number(uiValue) / 100));
+        audioSystem.setGenerativeMacro?.(name, normalized);
     }
 
     async function handlePlayClick() {
@@ -59,73 +112,52 @@
         audioSystem.triggerTestNote();
     }
 
-    function startDrag(e, param, min, max) {
-        e.preventDefault();
-        e.stopPropagation();
-
-        const node = e.currentTarget;
-        const rect = node.getBoundingClientRect();
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
-        draggingParam = { param, min, max, node, rect };
-
-        // Update immediately on click
-        updateValue(clientY);
-    }
-
-    function onMouseMove(e) {
-        if (!draggingParam) return;
-        e.preventDefault();
-        e.stopPropagation();
-        updateValue(e.clientY);
-    }
-
-    function onTouchMove(e) {
-        if (!draggingParam) return;
-        e.preventDefault(); // Prevent scrolling
-        e.stopPropagation();
-        updateValue(e.touches[0].clientY);
-    }
-
-    function onMouseUp(e) {
-        if (draggingParam) {
-            draggingParam = null;
+    async function toggleGenerative() {
+        if (!audioSystem.isInitialized) {
+            await audioSystem.init();
         }
+        audioSystem.setGenerativeEnabled?.(!generativeEnabled);
+        refreshGenerativeState();
     }
 
-    function updateValue(clientY) {
-        if (!draggingParam) return;
+    function toggleKeyLock() {
+        audioSystem.lockDetectedKey?.(!keyLocked);
+        refreshGenerativeState();
+    }
 
-        const { param, min, max, rect } = draggingParam;
+    function updateRnboSlider(param, value) {
+        const numeric = Number(value);
+        if (param === "window") windowMs = numeric;
+        if (param === "chorus") chorus = numeric;
+        if (param === "delay") delayMs = numeric;
+        if (param === "feedback") feedback = numeric;
+        if (param === "mix") mix = numeric;
+        if (param === "pitchvol") pitchvol = numeric;
+        if (param === "revvol") revvol = numeric;
+        if (param === "octdamp") octdamp = numeric;
+        if (param === "octvol") octvol = numeric;
+        updateParam(param, numeric);
+    }
 
-        const height = rect.height;
-        const relativeY = rect.bottom - clientY;
-
-        let percentage = relativeY / height;
-        percentage = Math.max(0, Math.min(1, percentage));
-
-        const newValue = min + percentage * (max - min);
-
-        if (param === "window") windowMs = newValue;
-        if (param === "chorus") chorus = newValue;
-        if (param === "delay") delayMs = newValue;
-        if (param === "feedback") feedback = newValue;
-        if (param === "mix") mix = newValue;
-        if (param === "pitchvol") pitchvol = newValue;
-        if (param === "revvol") revvol = newValue;
-        if (param === "octdamp") octdamp = newValue;
-        if (param === "octvol") octvol = newValue;
-
-        updateParam(param, newValue);
+    function sliderValue(id) {
+        if (id === "window") return windowMs;
+        if (id === "chorus") return chorus;
+        if (id === "delay") return delayMs;
+        if (id === "feedback") return feedback;
+        if (id === "mix") return mix;
+        if (id === "pitchvol") return pitchvol;
+        if (id === "revvol") return revvol;
+        if (id === "octdamp") return octdamp;
+        if (id === "octvol") return octvol;
+        return 0;
     }
 </script>
 
 {#if visible}
     <div
-        class="audio-controls fixed bottom-4 left-1/2 transform -translate-x-1/2 md:right-8 md:top-1/2 md:bottom-auto md:left-auto md:translate-x-0 md:-translate-y-1/2 z-[9999] flex flex-col items-end gap-2 pointer-events-auto select-none"
+        class="audio-controls fixed bottom-3 left-1/2 transform -translate-x-1/2 md:right-8 md:top-1/2 md:bottom-auto md:left-auto md:translate-x-0 md:-translate-y-1/2 z-[9999] flex flex-col items-end gap-2 pointer-events-auto select-none w-[min(92vw,380px)]"
         in:fly={{ x: 50, duration: 1000 }}
     >
-        <!-- Toggle Button -->
         <button
             class="bg-black/40 backdrop-blur-md text-white/80 border border-white/20 rounded-full px-4 py-2 text-xs font-bold tracking-widest hover:bg-white/10 hover:text-white transition-all uppercase"
             on:click={() => (isExpanded = !isExpanded)}
@@ -133,55 +165,131 @@
             {isExpanded ? "Hide Audio" : "Audio Params"}
         </button>
 
-        <!-- Play Button -->
+        <button
+            type="button"
+            class="bg-black/40 backdrop-blur-md text-white/80 border border-white/20 rounded-full px-4 py-2 text-xs font-bold tracking-widest hover:bg-white/10 hover:text-white transition-all uppercase"
+            disabled={webcamLoading}
+            on:click|stopPropagation={() => dispatch("toggleWebcamProjection")}
+        >
+            {#if webcamEnabled}
+                Disable webcam projection
+            {:else if webcamLoading}
+                Starting camera...
+            {:else}
+                Enable webcam projection
+            {/if}
+        </button>
+        {#if webcamError}
+            <p class="webcam-error">{webcamError}</p>
+        {/if}
+
         {#if isExpanded}
             <button
-                class="bg-black/40 backdrop-blur-md text-white/80 border border-white/20 rounded-full px-4 py-2 text-xs font-bold tracking-widest hover:bg-white/10 hover:text-[#FF0080] transition-all uppercase mb-2"
+                class="bg-black/40 backdrop-blur-md text-white/80 border border-white/20 rounded-full px-4 py-2 text-xs font-bold tracking-widest hover:bg-white/10 hover:text-[#FF0080] transition-all uppercase"
                 on:click|stopPropagation={handlePlayClick}
             >
                 Play
             </button>
-        {/if}
 
-        <!-- Controls Container -->
-        {#if isExpanded}
             <div
-                class="flex flex-row gap-1 p-3 backdrop-blur-md bg-black/20 rounded-xl border border-white/10"
+                class="w-full p-3 backdrop-blur-md bg-black/25 rounded-xl border border-white/10 max-h-[78vh] overflow-y-auto"
                 transition:fade={{ duration: 200 }}
             >
-                <!-- Compact Slider Component -->
-                {#each [{ id: "window", label: "WIN", val: windowMs, min: 1, max: 1000 }, { id: "chorus", label: "CHO", val: chorus, min: 0, max: 100 }, { id: "delay", label: "DEL", val: delayMs, min: 0, max: 2000 }, { id: "feedback", label: "FDB", val: feedback, min: 0, max: 95 }, { id: "mix", label: "MIX", val: mix, min: 0, max: 100 }, { id: "pitchvol", label: "PVOL", val: pitchvol, min: 0, max: 100 }, { id: "revvol", label: "RVOL", val: revvol, min: 0, max: 100 }, { id: "octdamp", label: "ODMP", val: octdamp, min: 0, max: 100 }, { id: "octvol", label: "OVOL", val: octvol, min: 0, max: 100 }] as slider}
-                    <div
-                        class="control-group group flex flex-col items-center w-5"
+                <div class="flex items-center justify-between text-[10px] tracking-wider text-white/70 uppercase mb-2">
+                    <span>Generative Partner</span>
+                    <span>{modeState}</span>
+                </div>
+
+                <div class="flex gap-2 mb-2">
+                    <button
+                        type="button"
+                        class="flex-1 bg-black/40 border border-white/20 rounded-md px-2 py-1 text-[10px] tracking-wider uppercase text-white/80 hover:bg-white/10"
+                        on:click|stopPropagation={toggleGenerative}
                     >
-                        <button
-                            type="button"
-                            aria-label={`Adjust ${slider.label}`}
-                            class="slider-container h-24 w-full bg-white/5 rounded-full relative cursor-pointer touch-none overflow-hidden group-hover:bg-white/10 transition-colors"
-                            on:mousedown={(e) =>
-                                startDrag(e, slider.id, slider.min, slider.max)}
-                            on:touchstart={(e) =>
-                                startDrag(e, slider.id, slider.min, slider.max)}
-                        >
-                            <div
-                                class="absolute bottom-0 left-0 w-full bg-white/80 group-hover:bg-[#FF0080] transition-colors"
-                                style="height: {((slider.val - slider.min) /
-                                    (slider.max - slider.min)) *
-                                    100}%"
-                            ></div>
-                        </button>
-                        <div
-                            class="label text-[7px] font-bold tracking-wider text-white/40 mt-2 text-center group-hover:text-white transition-colors"
-                        >
-                            {slider.label}
-                        </div>
-                    </div>
-                {/each}
+                        {generativeEnabled ? "Generative: On" : "Generative: Off"}
+                    </button>
+                    <button
+                        type="button"
+                        class="flex-1 bg-black/40 border border-white/20 rounded-md px-2 py-1 text-[10px] tracking-wider uppercase text-white/80 hover:bg-white/10"
+                        on:click|stopPropagation={toggleKeyLock}
+                    >
+                        {keyLocked ? "Key Lock: On" : "Key Lock: Off"}
+                    </button>
+                </div>
+
+                <div class="text-[10px] text-white/70 mb-2 leading-tight">
+                    <div>Detected: {detectedLabel}</div>
+                    <div>BPM: {bpmLabel}</div>
+                </div>
+
+                <div class="grid grid-cols-1 gap-2 mb-3">
+                    {#each [
+                        { id: "autonomy", label: "Autonomy", val: autonomy },
+                        { id: "density", label: "Density", val: density },
+                        { id: "response", label: "Response", val: response },
+                        { id: "mood", label: "Mood", val: mood },
+                        { id: "tempoBias", label: "Tempo Bias", val: tempoBias }
+                    ] as macro}
+                        <label class="block">
+                            <div class="flex items-center justify-between text-[10px] uppercase tracking-wider text-white/60 mb-1">
+                                <span>{macro.label}</span>
+                                <span>{macro.val}</span>
+                            </div>
+                            <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                value={macro.val}
+                                class="w-full accent-[#FF0080]"
+                                on:input={(e) => {
+                                    const val = Number(e.currentTarget.value);
+                                    if (macro.id === "autonomy") autonomy = val;
+                                    if (macro.id === "density") density = val;
+                                    if (macro.id === "response") response = val;
+                                    if (macro.id === "mood") mood = val;
+                                    if (macro.id === "tempoBias") tempoBias = val;
+                                    updateMacro(macro.id, val);
+                                }}
+                            />
+                        </label>
+                    {/each}
+                </div>
+
+                <div class="grid grid-cols-1 gap-2">
+                    <div class="text-[10px] tracking-wider text-cyan-300/80 uppercase">RNBO FX</div>
+                    {#each rnboSliders as slider}
+                        <label class="block">
+                            <div class="flex items-center justify-between text-[10px] uppercase tracking-wider text-cyan-100/70 mb-1">
+                                {slider.label}
+                            </div>
+                            <input
+                                type="range"
+                                min={slider.min}
+                                max={slider.max}
+                                value={sliderValue(slider.id)}
+                                class="w-full accent-cyan-400"
+                                on:input={(e) => updateRnboSlider(slider.id, e.currentTarget.value)}
+                            />
+                        </label>
+                    {/each}
+                </div>
+
             </div>
         {/if}
     </div>
 {/if}
 
 <style>
-    /* No extra styles needed, using Tailwind */
+    input[type="range"] {
+        height: 14px;
+    }
+
+    .webcam-error {
+        color: #ffd1e5;
+        font-size: 0.85rem;
+        letter-spacing: 0.02em;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.42);
+        text-align: right;
+        width: 100%;
+    }
 </style>

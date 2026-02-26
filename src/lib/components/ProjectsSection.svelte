@@ -58,13 +58,6 @@
 	<div
 		class="project-group mb-32 w-full xl:flex xl:flex-col xl:items-start xl:max-w-[56rem] 2xl:max-w-[64rem]"
 	>
-		<h3
-			class="text-3xl font-black tracking-widest mb-16 opacity-80 adaptive-text w-full xl:max-w-[56rem] 2xl:max-w-[64rem]"
-			class:text-white={adaptiveTextClass === "text-white"}
-			class:text-gray-900={adaptiveTextClass === "text-gray-900"}
-		>
-			<mark style="background: none;" class="text-[#FF0080]">//</mark> MUSIC
-		</h3>
 		{#each musicProjects as data, i}
 			{@const youtubeId = data.links?.youtube
 				? (() => {

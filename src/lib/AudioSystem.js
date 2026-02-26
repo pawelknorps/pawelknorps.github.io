@@ -4,6 +4,7 @@
 // import pkg from '@rnbo/js';
 // const { createDevice } = pkg;
 // import patcher from '$lib/rnbo/efxplussynth.json';
+import { GenerativeConductor } from '$lib/GenerativeConductor.js';
 
 class AudioSystem {
     constructor() {
@@ -14,6 +15,7 @@ class AudioSystem {
         this.isInitialized = false;
         this.rnboPkg = null;
         this.volume = 0.52;
+        this.synthVelocityScale = 0.42;
 
         // Parameter state
         this.params = {
@@ -26,6 +28,7 @@ class AudioSystem {
         // Throttling
         this.lastCallTimes = {
             drag: 0,
+            generativeLow: 0,
             hover: 0,
             click: 0,
             ambient: 0
@@ -42,6 +45,14 @@ class AudioSystem {
         this.userSoundProfile = null;
         this.userSoundProfileVersion = 2;
         this.initPromise = null;
+        this.generativeConductor = null;
+        this.generativeEnabled = true;
+        this.generativeSuppressed = false;
+        this.generativeMacros = this.generateGenerativeProfile();
+        this.generativeKeyLocked = false;
+        this.conductorTickIntervalId = null;
+        this.pendingScheduledTimeouts = new Set();
+        this.activeGeneratedNotes = new Set();
     }
 
     async init() {
@@ -77,8 +88,9 @@ class AudioSystem {
             this.analyser.fftSize = 256;
             this.analyser.smoothingTimeConstant = 0.9; // Smoother response
 
-            // Check for mobile device (width < 768px)
-            const isMobile = window.innerWidth < 768;
+            // Skip RNBO only for touch-centric narrow mobile environments.
+            const hasTouch = typeof navigator !== 'undefined' && (navigator.maxTouchPoints || 0) > 0;
+            const isMobile = hasTouch && window.innerWidth < 768;
 
             if (!isMobile) {
                 // Setup MIDI immediately (don't wait for RNBO to load)
@@ -178,6 +190,8 @@ class AudioSystem {
             this.applyParameterMap(this.userSoundProfile);
 
             this.attachComputerKeyboard();
+            this.initGenerativeConductor();
+            this.startGenerativeLoop();
             console.log('RNBO Device Loaded', this.rnboDevice.parameters);
 
         } catch (err) {
@@ -185,6 +199,8 @@ class AudioSystem {
             // Fallback connection if RNBO fails
             this.masterGain.connect(this.analyser);
             this.analyser.connect(this.audioContext.destination);
+            this.stopGenerativeLoop();
+            this.generativeConductor = null;
         }
     }
 
@@ -197,6 +213,18 @@ class AudioSystem {
         return min + t * (max - min);
     }
 
+    generateGenerativeProfile() {
+        // Refresh-randomized defaults, intentionally biased above 50%.
+        const highBias = () => this.randomInRange(0.52, 0.96);
+        return {
+            autonomy: highBias(),
+            density: highBias(),
+            response: highBias(),
+            mood: highBias(),
+            tempoBias: highBias()
+        };
+    }
+
     generateUserSoundProfile() {
         const mode = Math.floor(Math.random() * 4);
         const profile = {
@@ -207,7 +235,8 @@ class AudioSystem {
             feedback: Math.round(this.skewedRandom(8, 95, mode === 3 ? 0.75 : 1.4)),
 
             // Extra RNBO-facing params
-            mix: Math.round(this.randomInRange(10, 100)),
+            // Keep mix generally above 50% while still varied.
+            mix: Math.round(this.randomInRange(55, 100)),
             pitchvol: Math.round(this.randomInRange(5, 100)),
             revvol: Math.round(this.randomInRange(0, 100)),
             octdamp: Math.round(this.randomInRange(0, 100)),
@@ -237,6 +266,156 @@ class AudioSystem {
         Object.entries(paramMap).forEach(([name, value]) => {
             this.setParameter(name, value);
         });
+    }
+
+    nowMs() {
+        return (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    }
+
+    initGenerativeConductor() {
+        if (!this.rnboDevice || !this.audioContext) return;
+        if (this.generativeConductor) {
+            this.generativeConductor.setEnabled(this.getEffectiveGenerativeEnabled());
+            this.generativeConductor.setKeyLock(this.generativeKeyLocked);
+            Object.entries(this.generativeMacros).forEach(([name, value]) => {
+                this.generativeConductor.setMacro(name, value);
+            });
+            return;
+        }
+
+        this.generativeConductor = new GenerativeConductor({
+            scheduleNoteAt: (note, velocity, startTimeMs, durationMs, channel = 0) => {
+                this.scheduleNoteAt(note, velocity, startTimeMs, durationMs, channel);
+            },
+            setParameter: (name, value) => {
+                this.setParameter(name, value);
+            },
+            getParameterValue: (name) => this.params[name],
+            nowMs: () => this.nowMs(),
+            triggerLowTexture: (intensity = 0.6) => {
+                this.playGenerativeLowTexture(intensity);
+            }
+        });
+
+        this.generativeConductor.setEnabled(this.getEffectiveGenerativeEnabled());
+        this.generativeConductor.setKeyLock(this.generativeKeyLocked);
+        Object.entries(this.generativeMacros).forEach(([name, value]) => {
+            this.generativeConductor.setMacro(name, value);
+        });
+        this.generativeConductor.start();
+    }
+
+    startGenerativeLoop() {
+        if (!this.generativeConductor || this.conductorTickIntervalId) return;
+        this.generativeConductor.rebaseClock();
+        this.conductorTickIntervalId = window.setInterval(() => {
+            this.generativeConductor?.tick(this.nowMs());
+        }, 80);
+    }
+
+    stopGenerativeLoop() {
+        if (this.conductorTickIntervalId) {
+            window.clearInterval(this.conductorTickIntervalId);
+            this.conductorTickIntervalId = null;
+        }
+        this.generativeConductor?.stop();
+        for (const timeoutId of this.pendingScheduledTimeouts) {
+            window.clearTimeout(timeoutId);
+        }
+        this.pendingScheduledTimeouts.clear();
+        this.panicGeneratedNotes();
+    }
+
+    panicGeneratedNotes() {
+        for (const note of this.activeGeneratedNotes) {
+            this.noteOff(note, 0, { source: 'generated' });
+        }
+        this.activeGeneratedNotes.clear();
+    }
+
+    scheduleNoteAt(note, velocity, startTimeMs, durationMs, channel = 0) {
+        if (!this.rnboDevice || !this.audioContext) return;
+
+        const safeNote = Math.max(0, Math.min(127, Math.round(Number(note) || 0)));
+        const safeVelocity = Math.max(1, Math.min(127, Math.round(Number(velocity) || 80)));
+        const safeDuration = Math.max(60, Math.round(Number(durationMs) || 220));
+        const now = this.nowMs();
+        const noteOnDelayMs = Math.max(0, Math.round((Number(startTimeMs) || now) - now));
+
+        const noteOnTimeout = window.setTimeout(() => {
+            this.pendingScheduledTimeouts.delete(noteOnTimeout);
+            this.activeGeneratedNotes.add(safeNote);
+            this.noteOn(safeNote, safeVelocity, channel, { source: 'generated' });
+
+            const noteOffTimeout = window.setTimeout(() => {
+                this.pendingScheduledTimeouts.delete(noteOffTimeout);
+                this.activeGeneratedNotes.delete(safeNote);
+                this.noteOff(safeNote, channel, { source: 'generated' });
+            }, safeDuration);
+            this.pendingScheduledTimeouts.add(noteOffTimeout);
+        }, noteOnDelayMs);
+
+        this.pendingScheduledTimeouts.add(noteOnTimeout);
+    }
+
+    getEffectiveGenerativeEnabled() {
+        return this.generativeEnabled && !this.generativeSuppressed;
+    }
+
+    setGenerativeEnabled(enabled) {
+        this.generativeEnabled = !!enabled;
+        this.generativeConductor?.setEnabled(this.getEffectiveGenerativeEnabled());
+        if (!this.getEffectiveGenerativeEnabled()) {
+            this.panicGeneratedNotes();
+        }
+    }
+
+    setGenerativeSuppressed(suppressed) {
+        this.generativeSuppressed = !!suppressed;
+        this.generativeConductor?.setEnabled(this.getEffectiveGenerativeEnabled());
+        if (this.generativeSuppressed) {
+            this.panicGeneratedNotes();
+        }
+    }
+
+    setGenerativeMacro(name, value) {
+        if (!(name in this.generativeMacros)) return;
+        const clampedValue = Math.max(0, Math.min(1, Number(value) || 0));
+        this.generativeMacros[name] = clampedValue;
+        this.generativeConductor?.setMacro(name, clampedValue);
+    }
+
+    lockDetectedKey(lock) {
+        this.generativeKeyLocked = !!lock;
+        this.generativeConductor?.setKeyLock(this.generativeKeyLocked);
+    }
+
+    getGenerativeState() {
+        if (!this.generativeConductor) {
+            return {
+                enabled: this.generativeEnabled,
+                effectiveEnabled: this.getEffectiveGenerativeEnabled(),
+                suppressed: this.generativeSuppressed,
+                bpm: 86,
+                keyRoot: 0,
+                mode: 'dorian',
+                density: this.generativeMacros.density,
+                autonomy: this.generativeMacros.autonomy,
+                response: this.generativeMacros.response,
+                mood: this.generativeMacros.mood,
+                tempoBias: this.generativeMacros.tempoBias,
+                keyLocked: this.generativeKeyLocked,
+                idleLevel: 0,
+                modeState: 'idle'
+            };
+        }
+        const state = this.generativeConductor.getState();
+        return {
+            ...state,
+            enabled: this.generativeEnabled,
+            effectiveEnabled: this.getEffectiveGenerativeEnabled(),
+            suppressed: this.generativeSuppressed
+        };
     }
 
     setupMIDI() {
@@ -269,6 +448,16 @@ class AudioSystem {
         if (!this.rnboDevice) return;
 
         const [status, data1, data2] = message.data;
+        const command = status & 0xf0;
+        const channel = status & 0x0f;
+        if (command === 0x90 && data2 > 0) {
+            this.noteOn(data1, data2, channel, { source: 'external' });
+            return;
+        }
+        if (command === 0x80 || (command === 0x90 && data2 === 0)) {
+            this.noteOff(data1, channel, { source: 'external' });
+            return;
+        }
         this.sendMidi(status, data1, data2);
     }
 
@@ -294,7 +483,11 @@ class AudioSystem {
 
         const midiStatus = Number(status) & 0xff;
         const midiNote = Math.max(0, Math.min(127, Number(note) || 0));
-        const midiVelocity = Math.max(0, Math.min(127, Number(velocity) || 0));
+        const command = midiStatus & 0xf0;
+        let midiVelocity = Math.max(0, Math.min(127, Number(velocity) || 0));
+        if (command === 0x90 && midiVelocity > 0) {
+            midiVelocity = Math.max(1, Math.min(127, Math.round(midiVelocity * this.synthVelocityScale)));
+        }
 
         const midiEvent = new this.rnboPkg.MIDIEvent(
             this.audioContext.currentTime * 1000,
@@ -303,20 +496,25 @@ class AudioSystem {
         );
         this.rnboDevice.scheduleEvent(midiEvent);
 
-        const command = midiStatus & 0xf0;
         if (command === 0x90 && midiVelocity > 0) {
             this.noteTriggerHandler?.(midiNote, midiVelocity);
         }
     }
 
-    noteOn(note, velocity = 100, channel = 0) {
+    noteOn(note, velocity = 100, channel = 0, meta = { source: 'external' }) {
         const status = 0x90 | (channel & 0x0f);
         this.sendMidi(status, note, velocity);
+        if (meta?.source === 'external') {
+            this.generativeConductor?.onExternalNoteOn(note, velocity, this.nowMs());
+        }
     }
 
-    noteOff(note, channel = 0) {
+    noteOff(note, channel = 0, meta = { source: 'external' }) {
         const status = 0x80 | (channel & 0x0f);
         this.sendMidi(status, note, 0);
+        if (meta?.source === 'external') {
+            this.generativeConductor?.onExternalNoteOff(note, this.nowMs());
+        }
     }
 
     emitNarrationPulse(charIndex = 0, totalChars = 1, boundaryName = 'word') {
@@ -345,13 +543,18 @@ class AudioSystem {
     isEditableTarget(target) {
         if (!target) return false;
         const tagName = target.tagName?.toLowerCase?.();
-        if (tagName === 'input' || tagName === 'textarea' || tagName === 'select') return true;
+        if (tagName === 'textarea' || tagName === 'select') return true;
+        if (tagName === 'input') {
+            const inputType = (target.type || '').toLowerCase();
+            // Sliders/buttons/toggles should not block musical keyboard input.
+            return inputType !== 'range' && inputType !== 'button' && inputType !== 'checkbox' && inputType !== 'radio';
+        }
         return target.isContentEditable === true;
     }
 
     panicKeyboardNotes() {
         for (const note of this.activeKeyboardNotes) {
-            this.noteOff(note, 0);
+            this.noteOff(note, 0, { source: 'external' });
         }
         this.activeKeyboardNotes.clear();
     }
@@ -379,7 +582,7 @@ class AudioSystem {
 
             event.preventDefault();
             this.activeKeyboardNotes.add(note);
-            this.noteOn(note, 100, 0);
+            this.noteOn(note, 100, 0, { source: 'external' });
         };
 
         const onKeyUp = (event) => {
@@ -389,16 +592,20 @@ class AudioSystem {
 
             event.preventDefault();
             this.activeKeyboardNotes.delete(note);
-            this.noteOff(note, 0);
+            this.noteOff(note, 0, { source: 'external' });
         };
 
         const onWindowBlur = () => {
             this.panicKeyboardNotes();
+            this.panicGeneratedNotes();
         };
 
         const onVisibilityChange = () => {
             if (document.hidden) {
                 this.panicKeyboardNotes();
+                this.panicGeneratedNotes();
+            } else {
+                this.generativeConductor?.rebaseClock();
             }
         };
 
@@ -414,9 +621,13 @@ class AudioSystem {
         window.addEventListener('blur', onWindowBlur);
         document.addEventListener('visibilitychange', onVisibilityChange);
         this.keyboardAttached = true;
+        if (this.generativeConductor && this.generativeEnabled) {
+            this.startGenerativeLoop();
+        }
     }
 
     detachComputerKeyboard() {
+        this.stopGenerativeLoop();
         if (!this.keyboardAttached || !this.keyboardHandlers || typeof window === 'undefined') return;
 
         const { onKeyDown, onKeyUp, onWindowBlur, onVisibilityChange } = this.keyboardHandlers;
@@ -483,12 +694,15 @@ class AudioSystem {
         welcome.stop(currentTime + 1.0);
     }
 
-    playDragSound() {
+    playDragSound(options = {}) {
         if (!this.isInitialized) return;
 
         const now = performance.now();
-        if (now - this.lastCallTimes.drag < 80) return; // Throttle to ~12 calls/sec
-        this.lastCallTimes.drag = now;
+        const throttleMs = Math.max(50, Number(options.throttleMs) || 80);
+        const throttleKey = options.throttleKey || 'drag';
+        const lastCall = this.lastCallTimes[throttleKey] || 0;
+        if (now - lastCall < throttleMs) return; // Throttle
+        this.lastCallTimes[throttleKey] = now;
 
         const currentTime = this.audioContext.currentTime;
 
@@ -501,7 +715,9 @@ class AudioSystem {
         grain2.type = 'triangle';
         noise.type = 'sawtooth';
 
-        const baseFreq = 70 + Math.random() * 30;
+        const baseMin = Number(options.baseMin) || 70;
+        const baseMax = Number(options.baseMax) || 100;
+        const baseFreq = baseMin + Math.random() * Math.max(1, baseMax - baseMin);
         grain1.frequency.setValueAtTime(baseFreq, currentTime);
         grain2.frequency.setValueAtTime(baseFreq * 1.618, currentTime); // Golden ratio
         noise.frequency.setValueAtTime(baseFreq * 0.5, currentTime);
@@ -523,8 +739,11 @@ class AudioSystem {
         filter2.Q.setValueAtTime(1.5, currentTime);
 
         const dragGain = this.audioContext.createGain();
-        dragGain.gain.setValueAtTime(0.16, currentTime);
-        dragGain.gain.exponentialRampToValueAtTime(0.006, currentTime + 0.5);
+        const gainStart = Math.max(0.02, Number(options.gainStart) || 0.16);
+        const gainEnd = Math.max(0.0005, Number(options.gainEnd) || 0.006);
+        const duration = Math.max(0.25, Number(options.duration) || 0.5);
+        dragGain.gain.setValueAtTime(gainStart, currentTime);
+        dragGain.gain.exponentialRampToValueAtTime(gainEnd, currentTime + duration);
 
         // Complex signal routing
         grain1.connect(filter1);
@@ -537,9 +756,15 @@ class AudioSystem {
         grain1.start();
         grain2.start();
         noise.start();
-        grain1.stop(currentTime + 0.5);
-        grain2.stop(currentTime + 0.5);
-        noise.stop(currentTime + 0.5);
+        grain1.stop(currentTime + duration);
+        grain2.stop(currentTime + duration);
+        noise.stop(currentTime + duration);
+    }
+
+    playGenerativeLowTexture(intensity = 0.6) {
+        if (!this.isInitialized) return;
+        // Use the exact same drag synthesis path/timbre as manual 3D sphere dragging.
+        this.playDragSound({ throttleKey: 'generativeLow' });
     }
 
     playClickSound() {

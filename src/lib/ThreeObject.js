@@ -129,7 +129,9 @@ const morphShader = {
         uAudioMid: { value: 0 },
         uAudioHigh: { value: 0 },
         uNotePulse: { value: 0 },
-        uEnergy: { value: 0 }
+        uEnergy: { value: 0 },
+        uDisturbance: { value: 0 },
+        uWebcamMode: { value: 0 }
     },
     vertexShader: `
         // Classic Perlin 3D Noise by Stefan Gustavson
@@ -211,6 +213,7 @@ const morphShader = {
         uniform float uAudioHigh;
         uniform float uNotePulse;
         uniform float uEnergy;
+        uniform float uDisturbance;
         varying vec2 vUv;
 
         void main() {
@@ -226,9 +229,22 @@ const morphShader = {
             float c = cos(swirl);
             float s = sin(swirl);
             pos.xz = mat2(c, -s, s, c) * pos.xz;
+            float disturb = uDisturbance;
+            float fold = sin((pos.y * 22.0 + pos.x * 14.0) - time * 540.0) * disturb * 0.11;
+            float pinch = (1.0 - abs(normal.y)) * disturb;
+            pos *= 1.0 + pinch * 0.09 * sin(time * 180.0 + length(pos) * 32.0);
+            pos.xy += vec2(
+                sin(pos.y * 24.0 + time * 420.0),
+                cos(pos.x * 21.0 - time * 390.0)
+            ) * disturb * 0.045;
+            vec3 warpedNormal = normalize(normal + vec3(
+                sin(pos.y * 35.0 + time * 300.0),
+                cos(pos.x * 30.0 - time * 260.0),
+                sin(pos.z * 28.0 + time * 240.0)
+            ) * disturb * 0.35);
             float axisWarp = sin((pos.y + time * 150.0) * 4.0) * uAudioLow * 0.04
                 + cos((pos.x - time * 90.0) * 5.0) * uAudioHigh * 0.02;
-            pos = pos + normal * (bassBreath + midTurbulence + highCrackle + pulsePush + radialWarp + axisWarp);
+            pos = pos + warpedNormal * (bassBreath + midTurbulence + highCrackle + pulsePush + radialWarp + axisWarp + fold);
             gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
         }
     `,
@@ -246,14 +262,26 @@ const morphShader = {
         uniform float uAudioHigh;
         uniform float uNotePulse;
         uniform float uEnergy;
+        uniform float uDisturbance;
+        uniform float uWebcamMode;
         varying vec2 vUv;
 
         void main() {
-            vec2 offset = vec2(0.3, 0.2);
-            vec2 shiftedUv = fract(vUv + offset);
-            vec4 color1 = texture2D(tDiffuse1, shiftedUv);
-            vec4 color2 = texture2D(tDiffuse2, shiftedUv);
+            vec2 baseUv = vUv;
+            float audioFx = smoothstep(
+                0.1,
+                0.92,
+                clamp(uAudioLow * 0.45 + uAudioMid * 0.75 + uAudioHigh * 0.62 + uNotePulse * 0.55, 0.0, 1.25)
+            );
+            vec2 tear = vec2(
+                sin(vUv.y * 90.0 + time * 320.0),
+                cos(vUv.x * 82.0 - time * 260.0)
+            ) * uDisturbance * 0.006 * audioFx;
+            vec2 disturbedUv = mix(baseUv, fract(baseUv + tear), audioFx * 0.5);
+            vec4 color1 = texture2D(tDiffuse1, baseUv);
+            vec4 color2 = texture2D(tDiffuse2, disturbedUv);
             vec4 baseColor = mix(color1, color2, morphFactor);
+            float webcamMode = clamp(uWebcamMode, 0.0, 1.0);
 
             vec2 textUv = vec2(
                 fract(vUv.x * 1.18 + time * 0.012),
@@ -261,21 +289,38 @@ const morphShader = {
             );
             textUv.x += sin((textUv.y * 46.0) + (time * 5.0)) * 0.0025;
             vec4 textColor = texture2D(tAboutText, textUv);
-            float textMask = smoothstep(0.08, 0.9, textColor.a) * aboutTextIntensity;
+            float textMask = smoothstep(0.08, 0.9, textColor.a) * aboutTextIntensity * (1.0 - webcamMode);
             float letterPulse = 0.88 + 0.12 * sin((vUv.x * 90.0) + (vUv.y * 40.0) + (time * 3.2));
             float scanline = 0.985 + 0.015 * sin((vUv.y + time * 0.04) * 260.0);
             vec3 letterColor = vec3(0.98, 0.99, 1.0) * letterPulse;
             vec3 projected = mix(baseColor.rgb, letterColor, textMask * 0.9);
-            vec3 finalColor = projected * scanline;
+            vec3 finalColor = projected * mix(scanline, 1.0, webcamMode);
 
             vec2 videoUv = vec2(fract(vUv.x + time * 0.006), 1.0 - vUv.y);
+            vec2 webcamUv = vec2(fract(vUv.x + time * 0.006), vUv.y);
             vec3 videoColor = texture2D(tVideo, videoUv).rgb;
+            vec3 webcamColor = texture2D(tVideo, webcamUv).rgb;
             float videoMask = smoothstep(0.12, 0.92, videoMix);
-            finalColor = mix(finalColor, mix(finalColor, videoColor, 0.92), videoMask);
+            if (webcamMode > 0.5) {
+                gl_FragColor = vec4(webcamColor, 1.0);
+                return;
+            }
+            float videoBlendStrength = mix(0.92, 1.0, webcamMode);
+            finalColor = mix(finalColor, mix(finalColor, videoColor, videoBlendStrength), videoMask);
 
             float energy = clamp(uAudioLow * 0.5 + uAudioMid * 0.9 + uAudioHigh * 0.7 + uNotePulse, 0.0, 2.0);
-            finalColor = mix(finalColor, finalColor * (0.96 + 0.04 * sin(time * 180.0 + vUv.y * 26.0)), clamp(uAudioMid * 0.22, 0.0, 0.2));
+            finalColor = mix(finalColor, finalColor * (0.985 + 0.015 * sin(time * 180.0 + vUv.y * 26.0)), clamp(uAudioMid * 0.18, 0.0, 0.12));
             finalColor *= 0.98 + 0.02 * smoothstep(0.0, 1.4, energy);
+            float fxMask = (1.0 - webcamMode) * audioFx * 0.55;
+            float chromaOffset = (0.00035 + uDisturbance * 0.002) * fxMask;
+            float chromaR = texture2D(tDiffuse2, fract(disturbedUv + vec2(chromaOffset, 0.0))).r;
+            float chromaB = texture2D(tDiffuse1, fract(disturbedUv - vec2(chromaOffset * 0.75, 0.0))).b;
+            finalColor.r = mix(finalColor.r, chromaR, fxMask);
+            finalColor.b = mix(finalColor.b, chromaB, fxMask);
+            float horizontalTear = step(0.85, sin((vUv.y + time * 0.08) * 220.0)) * uDisturbance;
+            finalColor *= 1.0 - horizontalTear * 0.08 * fxMask;
+            vec3 inverseColor = 1.0 - finalColor;
+            finalColor = mix(finalColor, inverseColor, clamp(uDisturbance * 0.06, 0.0, 0.06) * fxMask);
 
             gl_FragColor = vec4(finalColor, baseColor.a);
         }
@@ -321,6 +366,105 @@ const focusSphereScale = 1.72;
 
 const projectPoints = new THREE.Group();
 SCENE.add(projectPoints);
+
+const canvasSubtitleState = {
+    roleText: 'Composer, Bassist, Producer',
+    musicText: '// MUSIC'
+};
+const canvasSubtitleSprites = {
+    role: null,
+    music: null
+};
+
+const disposeSpriteTexture = (sprite) => {
+    if (!sprite || !sprite.material || !sprite.material.map) return;
+    sprite.material.map.dispose();
+};
+
+const createCanvasTextSprite = (text, options = {}) => {
+    if (typeof document === 'undefined') return null;
+    const {
+        font = '500 58px "Space Grotesk", "Sora", sans-serif',
+        fillStyle = 'rgba(244, 247, 255, 0.95)',
+        shadowColor = 'rgba(0, 0, 0, 0.45)',
+        shadowBlur = 12,
+        paddingX = 28,
+        paddingY = 18
+    } = options;
+
+    const measureCanvas = document.createElement('canvas');
+    const measureCtx = measureCanvas.getContext('2d');
+    if (!measureCtx) return null;
+    measureCtx.font = font;
+    const metrics = measureCtx.measureText(text || '');
+    const textWidth = Math.max(1, Math.ceil(metrics.width));
+    const textHeight = 74;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = textWidth + paddingX * 2;
+    canvas.height = textHeight + paddingY * 2;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.font = font;
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = fillStyle;
+    ctx.shadowColor = shadowColor;
+    ctx.shadowBlur = shadowBlur;
+    ctx.fillText(text || '', paddingX, canvas.height / 2);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.needsUpdate = true;
+    const material = new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true,
+        depthTest: false,
+        depthWrite: false
+    });
+    const sprite = new THREE.Sprite(material);
+    const scaleFactor = 0.0018;
+    sprite.scale.set(canvas.width * scaleFactor, canvas.height * scaleFactor, 1);
+    sprite.renderOrder = 999;
+    return sprite;
+};
+
+const positionCanvasSubtitles = () => {
+    if (!canvasSubtitleSprites.role || !canvasSubtitleSprites.music) return;
+    const width = Math.max(1, window.innerWidth || 1);
+    const roleYOffset = width < 900 ? -0.05 : -0.14;
+    const musicYOffset = width < 900 ? -0.55 : -0.78;
+    canvasSubtitleSprites.role.position.set(-0.88, roleYOffset, -2.4);
+    canvasSubtitleSprites.music.position.set(-1.01, musicYOffset, -2.4);
+};
+
+const rebuildCanvasSubtitles = () => {
+    if (!CAMERA || typeof document === 'undefined') return;
+    if (canvasSubtitleSprites.role) {
+        CAMERA.remove(canvasSubtitleSprites.role);
+        disposeSpriteTexture(canvasSubtitleSprites.role);
+    }
+    if (canvasSubtitleSprites.music) {
+        CAMERA.remove(canvasSubtitleSprites.music);
+        disposeSpriteTexture(canvasSubtitleSprites.music);
+    }
+    canvasSubtitleSprites.role = createCanvasTextSprite(canvasSubtitleState.roleText, {
+        font: '400 56px "Space Grotesk", "Sora", sans-serif',
+        fillStyle: 'rgba(242, 245, 255, 0.92)',
+        shadowColor: 'rgba(6, 8, 16, 0.65)',
+        shadowBlur: 10
+    });
+    canvasSubtitleSprites.music = createCanvasTextSprite(canvasSubtitleState.musicText, {
+        font: '700 48px "Space Grotesk", "Sora", sans-serif',
+        fillStyle: 'rgba(255, 0, 128, 0.95)',
+        shadowColor: 'rgba(0, 0, 0, 0.4)',
+        shadowBlur: 8
+    });
+    if (canvasSubtitleSprites.role) CAMERA.add(canvasSubtitleSprites.role);
+    if (canvasSubtitleSprites.music) CAMERA.add(canvasSubtitleSprites.music);
+    positionCanvasSubtitles();
+};
 
 // Store projects data globally to be set from Svelte
 let allProjects = [];
@@ -667,6 +811,12 @@ const createDestructiblePoint = (project, position) => {
     pointGroup.userData = {
         ...project,
         originalPosition: pointGroup.position.clone(),
+        basePhi: position.phi,
+        baseTheta: position.theta,
+        orbitRadius: sphereRadius,
+        orbitAmplitude: 0.08 + Math.random() * 0.14,
+        orbitSpeedPhi: 0.12 + Math.random() * 0.28,
+        orbitSpeedTheta: 0.16 + Math.random() * 0.32,
         particleMaterial: particleMaterial,
         destructionFactor: 0,
         hoverFactor: 0,
@@ -697,6 +847,245 @@ let projectedVideoMixTarget = 0;
 let projectedVideoMixCurrent = 0;
 let projectedVideoEl = null;
 let projectedVideoTexture = null;
+let projectedMediaStream = null;
+let projectedVideoSourceType = null;
+let projectedStreamCanvas = null;
+let projectedStreamCanvasCtx = null;
+let projectedStreamTexture = null;
+let projectedFaceDetectCanvas = null;
+let projectedFaceDetectCtx = null;
+let projectedFaceDetector = null;
+let projectedFaceDetectPending = false;
+let projectedLastFaceDetectMs = 0;
+let projectedFaceLastSeenMs = 0;
+let projectedFaceState = {
+    hasFace: false,
+    centerX: 0.5,
+    centerY: 0.5,
+    size: 0.35
+};
+
+const ensureProjectedVideoElement = () => {
+    if (projectedVideoEl) return projectedVideoEl;
+    projectedVideoEl = document.createElement('video');
+    projectedVideoEl.crossOrigin = 'anonymous';
+    projectedVideoEl.muted = true;
+    projectedVideoEl.loop = true;
+    projectedVideoEl.playsInline = true;
+    return projectedVideoEl;
+};
+
+const ensureProjectedVideoTexture = () => {
+    if (projectedVideoTexture) return projectedVideoTexture;
+    projectedVideoTexture = new THREE.VideoTexture(ensureProjectedVideoElement());
+    projectedVideoTexture.minFilter = THREE.LinearFilter;
+    projectedVideoTexture.magFilter = THREE.LinearFilter;
+    if ('colorSpace' in projectedVideoTexture && srgbColorSpace) {
+        projectedVideoTexture.colorSpace = srgbColorSpace;
+    }
+    return projectedVideoTexture;
+};
+
+const ensureProjectedStreamCanvas = () => {
+    if (projectedStreamCanvas && projectedStreamCanvasCtx) return projectedStreamCanvas;
+    projectedStreamCanvas = document.createElement('canvas');
+    projectedStreamCanvas.width = 1024;
+    projectedStreamCanvas.height = 1024;
+    projectedStreamCanvasCtx = projectedStreamCanvas.getContext('2d', { alpha: false });
+    return projectedStreamCanvas;
+};
+
+const ensureProjectedStreamTexture = () => {
+    if (projectedStreamTexture) return projectedStreamTexture;
+    const canvas = ensureProjectedStreamCanvas();
+    projectedStreamTexture = new THREE.CanvasTexture(canvas);
+    projectedStreamTexture.minFilter = THREE.LinearFilter;
+    projectedStreamTexture.magFilter = THREE.LinearFilter;
+    if ('colorSpace' in projectedStreamTexture && srgbColorSpace) {
+        projectedStreamTexture.colorSpace = srgbColorSpace;
+    }
+    projectedStreamTexture.needsUpdate = true;
+    return projectedStreamTexture;
+};
+
+const resetProjectedFaceState = () => {
+    projectedFaceState = {
+        hasFace: false,
+        centerX: 0.5,
+        centerY: 0.5,
+        size: 0.35
+    };
+    projectedFaceDetectPending = false;
+    projectedLastFaceDetectMs = 0;
+    projectedFaceLastSeenMs = 0;
+};
+
+const ensureProjectedFaceDetector = () => {
+    if (projectedFaceDetector !== null) return projectedFaceDetector;
+    if (typeof window === 'undefined' || typeof window.FaceDetector !== 'function') {
+        projectedFaceDetector = false;
+        return projectedFaceDetector;
+    }
+    try {
+        projectedFaceDetector = new window.FaceDetector({
+            fastMode: true,
+            maxDetectedFaces: 1
+        });
+    } catch {
+        projectedFaceDetector = false;
+    }
+    return projectedFaceDetector;
+};
+
+const ensureProjectedFaceDetectCanvas = () => {
+    if (projectedFaceDetectCanvas && projectedFaceDetectCtx) return projectedFaceDetectCanvas;
+    projectedFaceDetectCanvas = document.createElement('canvas');
+    projectedFaceDetectCanvas.width = 320;
+    projectedFaceDetectCanvas.height = 320;
+    projectedFaceDetectCtx = projectedFaceDetectCanvas.getContext('2d', { alpha: false });
+    return projectedFaceDetectCanvas;
+};
+
+const updateProjectedFaceTracking = () => {
+    if (projectedVideoSourceType !== 'stream') return;
+    if (!projectedVideoEl || projectedVideoEl.readyState < 2) return;
+    const detector = ensureProjectedFaceDetector();
+    if (!detector || projectedFaceDetectPending) return;
+    const now = performance.now();
+    if (now - projectedLastFaceDetectMs < 180) return;
+    ensureProjectedFaceDetectCanvas();
+    if (!projectedFaceDetectCanvas || !projectedFaceDetectCtx) return;
+
+    projectedFaceDetectCtx.drawImage(
+        projectedVideoEl,
+        0,
+        0,
+        projectedFaceDetectCanvas.width,
+        projectedFaceDetectCanvas.height
+    );
+
+    projectedFaceDetectPending = true;
+    projectedLastFaceDetectMs = now;
+    detector
+        .detect(projectedFaceDetectCanvas)
+        .then((faces) => {
+            if (!Array.isArray(faces) || faces.length === 0) {
+                if (now - projectedFaceLastSeenMs > 1600) {
+                    projectedFaceState.hasFace = false;
+                }
+                return;
+            }
+            const face = faces[0];
+            const box = face.boundingBox;
+            if (!box) return;
+            const detectW = Math.max(1, projectedFaceDetectCanvas.width);
+            const detectH = Math.max(1, projectedFaceDetectCanvas.height);
+            const boxX = typeof box.x === 'number' ? box.x : box.left || 0;
+            const boxY = typeof box.y === 'number' ? box.y : box.top || 0;
+            const boxW = typeof box.width === 'number' ? box.width : 0;
+            const boxH = typeof box.height === 'number' ? box.height : 0;
+            if (!boxW || !boxH) return;
+            const centerX = (boxX + boxW * 0.5) / detectW;
+            const centerY = (boxY + boxH * 0.45) / detectH;
+            const faceSize = Math.max(boxW / detectW, boxH / detectH);
+            projectedFaceState.hasFace = true;
+            projectedFaceLastSeenMs = now;
+            projectedFaceState.centerX += (centerX - projectedFaceState.centerX) * 0.2;
+            projectedFaceState.centerY += (centerY - projectedFaceState.centerY) * 0.2;
+            projectedFaceState.size += (faceSize - projectedFaceState.size) * 0.16;
+        })
+        .catch(() => {
+            if (now - projectedFaceLastSeenMs > 1600) {
+                projectedFaceState.hasFace = false;
+            }
+        })
+        .finally(() => {
+            projectedFaceDetectPending = false;
+        });
+};
+
+const updateProjectedStreamFrame = () => {
+    if (projectedVideoSourceType !== 'stream') return;
+    if (!projectedVideoEl || projectedVideoEl.readyState < 2) return;
+    const videoWidth = projectedVideoEl.videoWidth || 0;
+    const videoHeight = projectedVideoEl.videoHeight || 0;
+    if (!videoWidth || !videoHeight) return;
+    ensureProjectedStreamCanvas();
+    if (!projectedStreamCanvasCtx || !projectedStreamCanvas) return;
+
+    updateProjectedFaceTracking();
+
+    const ctx = projectedStreamCanvasCtx;
+    const canvasW = projectedStreamCanvas.width;
+    const canvasH = projectedStreamCanvas.height;
+
+    let cropSize = Math.min(videoWidth, videoHeight);
+    let cropX = (videoWidth - cropSize) * 0.5;
+    let cropY = (videoHeight - cropSize) * 0.5;
+
+    if (projectedFaceState.hasFace) {
+        const cx = projectedFaceState.centerX * videoWidth;
+        const cy = projectedFaceState.centerY * videoHeight;
+        const facePx = projectedFaceState.size * Math.min(videoWidth, videoHeight);
+        // Zoom out from the face to keep more context (head + surroundings) in frame.
+        cropSize = Math.max(facePx * 4.6, Math.min(videoWidth, videoHeight) * 0.62);
+        cropSize = Math.min(cropSize, Math.min(videoWidth, videoHeight));
+        cropX = cx - cropSize * 0.5;
+        cropY = cy - cropSize * 0.46;
+    }
+
+    cropX = Math.max(0, Math.min(cropX, videoWidth - cropSize));
+    cropY = Math.max(0, Math.min(cropY, videoHeight - cropSize));
+
+    ctx.drawImage(projectedVideoEl, cropX, cropY, cropSize, cropSize, 0, 0, canvasW, canvasH);
+    if (projectedStreamTexture) {
+        projectedStreamTexture.needsUpdate = true;
+    }
+};
+
+const stopProjectedMediaStreamTracks = () => {
+    if (!projectedMediaStream) return;
+    projectedMediaStream.getTracks().forEach((track) => track.stop());
+    projectedMediaStream = null;
+};
+
+const hasProjectedVideoInput = () => projectedVideoSourceType === 'url' || projectedVideoSourceType === 'stream';
+const waitForVideoReadiness = async (videoEl, timeoutMs = 1800) => {
+    if (!videoEl) return;
+    if (videoEl.readyState >= 1) return;
+    await new Promise((resolve) => {
+        let settled = false;
+        const cleanup = () => {
+            videoEl.removeEventListener('loadedmetadata', onReady);
+            videoEl.removeEventListener('canplay', onReady);
+            videoEl.removeEventListener('error', onReady);
+        };
+        const onReady = () => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            resolve();
+        };
+        videoEl.addEventListener('loadedmetadata', onReady, { once: true });
+        videoEl.addEventListener('canplay', onReady, { once: true });
+        videoEl.addEventListener('error', onReady, { once: true });
+        setTimeout(onReady, timeoutMs);
+    });
+};
+
+const tryPlayVideoElement = async (videoEl, timeoutMs = 1200) => {
+    if (!videoEl || typeof videoEl.play !== 'function') return;
+    try {
+        const playPromise = videoEl.play();
+        if (!playPromise || typeof playPromise.then !== 'function') return;
+        await Promise.race([
+            playPromise.catch(() => null),
+            new Promise((resolve) => setTimeout(resolve, timeoutMs))
+        ]);
+    } catch {
+        // Ignore autoplay/playback quirks here; texture updates can still proceed.
+    }
+};
 let notePulse = 0;
 let audioEnergy = 0;
 let rotationAudioResponse = 0;
@@ -705,6 +1094,7 @@ let animationStarted = false;
 let animationFrameId = null;
 let sceneCanvas = null;
 let scrollVelocity = 0;
+let sceneStartTime = 0;
 let lastAmbientNoiseTime = 0;
 let nextAmbientNoiseDelay = 4200;
 
@@ -753,10 +1143,30 @@ const animate = async () => {
     const viewportHeight = Math.max(1, window.innerHeight || 1);
     const scrollNorm = clamp(scrollPosition / (viewportHeight * 1.8), 0, 1.25);
     const scrollVelocityNorm = clamp(Math.abs(scrollVelocity) / 28, 0, 1);
+    const webcamMotionDamping = projectedVideoSourceType === 'stream' ? 0.18 : 1;
+    const audioDrivenDisturbance = clamp(
+        uniforms.uAudioLow.value * 0.34 +
+            uniforms.uAudioMid.value * 0.62 +
+            uniforms.uAudioHigh.value * 0.56 +
+            uniforms.uNotePulse.value * 0.52,
+        0,
+        1.25
+    );
+    const tinyMotionBed = clamp(scrollNorm * 0.06 + scrollVelocityNorm * 0.08, 0, 0.16);
+    const disturbanceTarget = clamp(
+        (audioDrivenDisturbance + tinyMotionBed) * webcamMotionDamping,
+        0,
+        1.2
+    );
+    uniforms.uDisturbance.value = lerp(uniforms.uDisturbance.value, disturbanceTarget, 0.03);
+    const disturbance = uniforms.uDisturbance.value;
+    const webcamModeTarget = projectedVideoSourceType === 'stream' ? 1 : 0;
+    uniforms.uWebcamMode.value = webcamModeTarget;
     aboutProjectionCurrent += (aboutProjectionTarget - aboutProjectionCurrent) * 0.06;
     uniforms.aboutTextIntensity.value = aboutProjectionCurrent;
     projectedVideoMixCurrent += (projectedVideoMixTarget - projectedVideoMixCurrent) * 0.06;
     uniforms.videoMix.value = projectedVideoMixCurrent;
+    updateProjectedStreamFrame();
     bioFocusCurrent += (bioFocusTarget - bioFocusCurrent) * 0.05;
 
     if (audioSystem && audioSystem.isInitialized) {
@@ -773,11 +1183,11 @@ const animate = async () => {
         audioEnergy = lerp(audioEnergy, clamp(low * 0.45 + mid * 0.75 + high * 0.55 + notePulse * 0.42, 0, 1.4), 0.11);
         uniforms.uEnergy.value = audioEnergy;
         const rawRotationResponse = clamp(
-            low * 0.14 + mid * 0.34 + high * 0.16 + uniforms.uNotePulse.value * 0.22,
+            low * 0.08 + mid * 0.16 + high * 0.1 + uniforms.uNotePulse.value * 0.14,
             0,
-            1
+            0.55
         );
-        rotationAudioResponse = lerp(rotationAudioResponse, rawRotationResponse, 0.045);
+        rotationAudioResponse = lerp(rotationAudioResponse, rawRotationResponse, 0.025);
 
         notePulse *= 0.88;
         directionalLight.intensity = lerp(
@@ -819,7 +1229,8 @@ const animate = async () => {
         Math.max(0, -scaleWave) * uniforms.uEnergy.value * 0.12;
     const signedScaleDelta = pulseScaleBoost - pulseScaleDip;
     const scrollScaleMod = Math.sin(now * 0.0018 + scrollPosition * 0.0035) * 0.045 * (0.35 + scrollNorm);
-    const sphereScale = baseSphereScale + (focusSphereScale - baseSphereScale) * bioFocusCurrent + signedScaleDelta + scrollScaleMod;
+    const disturbanceScale = Math.sin(now * 0.0062 + scrollPosition * 0.012) * 0.03 * disturbance;
+    const sphereScale = baseSphereScale + (focusSphereScale - baseSphereScale) * bioFocusCurrent + signedScaleDelta + scrollScaleMod + disturbanceScale;
     const maxScaleForViewport = window.innerWidth < 900 ? 1.48 : 1.66;
     const clampedSphereScale = clamp(sphereScale, 0.78, maxScaleForViewport);
     SPHERE.scale.set(clampedSphereScale, clampedSphereScale, clampedSphereScale);
@@ -864,18 +1275,15 @@ const animate = async () => {
     }
 
     // Apply rotation to the main sphere
-    const energySpin = 1 + rotationAudioResponse * 0.32 + scrollNorm * 0.2;
-    const autoRotationX = now * 0.0001 * energySpin;
-    const autoRotationY = now * 0.0001 * (1 + rotationAudioResponse * 0.24 + scrollNorm * 0.16);
+    const energySpin = 1 + rotationAudioResponse * 0.12 + scrollNorm * 0.08 + disturbance * 0.16;
+    const autoRotationX = now * 0.000055 * energySpin;
+    const autoRotationY = now * 0.000065 * (1 + rotationAudioResponse * 0.1 + scrollNorm * 0.08 + disturbance * 0.2);
     
     SPHERE.rotation.x = sphereRotation.x + autoRotationX;
     SPHERE.rotation.y = sphereRotation.y + autoRotationY;
 
-    // Keep project bubbles independent from the main sphere rotation.
-    const bubbleAutoRotationX = now * 0.00008 * (1 + uniforms.uAudioLow.value * 0.22);
-    const bubbleAutoRotationY = now * 0.00012 * (1 + uniforms.uAudioMid.value * 0.2);
-    projectPoints.rotation.x = bubbleAutoRotationX;
-    projectPoints.rotation.y = bubbleAutoRotationY;
+    // Keep project bubbles independent from the main sphere transform.
+    projectPoints.rotation.set(0, 0, 0);
 
     z = scrollPosition/60+2;
     m = scrollPosition/5929+0.01;
@@ -887,8 +1295,10 @@ const animate = async () => {
     projectPoints.scale.setScalar(1 - bioFocusCurrent * 0.05);
     const scrollSwayX = Math.sin(scrollPosition * 0.002 + now * 0.0003) * 0.035 * scrollNorm;
     const scrollSwayY = Math.cos(scrollPosition * 0.0017 + now * 0.0004) * 0.05 * scrollNorm;
-    CAMERA.position.x = lerp(CAMERA.position.x, Math.sin(now * 0.0016) * uniforms.uAudioHigh.value * 0.03 + scrollSwayX, 0.04);
-    CAMERA.position.y = lerp(CAMERA.position.y, Math.cos(now * 0.0012) * uniforms.uAudioMid.value * 0.022 + scrollSwayY, 0.04);
+    const disturbanceShakeX = Math.sin(now * 0.013 + scrollPosition * 0.01) * 0.012 * disturbance;
+    const disturbanceShakeY = Math.cos(now * 0.015 - scrollPosition * 0.012) * 0.01 * disturbance;
+    CAMERA.position.x = lerp(CAMERA.position.x, Math.sin(now * 0.0016) * uniforms.uAudioHigh.value * 0.014 + scrollSwayX + disturbanceShakeX, 0.03);
+    CAMERA.position.y = lerp(CAMERA.position.y, Math.cos(now * 0.0012) * uniforms.uAudioMid.value * 0.012 + scrollSwayY + disturbanceShakeY, 0.03);
 
     if (audioSystem && audioSystem.isInitialized) {
         const ambientIntensity = clamp(uniforms.uEnergy.value * 0.45 + scrollVelocityNorm * 0.55, 0.2, 1);
@@ -906,10 +1316,18 @@ const animate = async () => {
         const material = userData.particleMaterial;
         
         // Slow breathing movement for each point
-        const timeFactor = (now * 0.0005) + userData.movementOffset;
+        const timeSeconds = now * 0.001;
+        const timeFactor = timeSeconds * 0.5 + userData.movementOffset;
         const movementScale = (0.03 + uniforms.uAudioLow.value * 0.03) * Math.sin(timeFactor);
-        const newPosition = userData.originalPosition.clone().multiplyScalar(1 + movementScale);
-        pointGroup.position.copy(newPosition);
+        const orbitAmp = userData.orbitAmplitude * (0.55 + uniforms.uAudioMid.value * 0.5);
+        const phi = userData.basePhi + Math.sin(timeSeconds * userData.orbitSpeedPhi + userData.movementOffset) * orbitAmp;
+        const theta = userData.baseTheta + Math.cos(timeSeconds * userData.orbitSpeedTheta + userData.movementOffset * 0.8) * orbitAmp;
+        const orbitRadius = userData.orbitRadius * (1 + movementScale);
+        pointGroup.position.set(
+            orbitRadius * Math.sin(phi) * Math.cos(theta),
+            orbitRadius * Math.sin(phi) * Math.sin(theta),
+            orbitRadius * Math.cos(phi)
+        );
 
         if (material && material.uniforms) {
             material.uniforms.time.value = now * 0.00001;
@@ -951,7 +1369,7 @@ export const resize = async () => {
         Renderer.setSize(window.innerWidth, window.innerHeight);
         CAMERA.aspect = window.innerWidth / window.innerHeight;
         CAMERA.updateProjectionMatrix();
-        
+        positionCanvasSubtitles();
     }
 };
 
@@ -1172,6 +1590,7 @@ export const setScene = async (canvas) => {
         SPHERE.material.uniforms.tAboutText.value = aboutTextTexture;
     }
     SPHERE.material.uniforms.aboutTextIntensity.value = aboutProjectionCurrent;
+    rebuildCanvasSubtitles();
     
     canvas.style.cursor = 'grab';
     
@@ -1193,6 +1612,7 @@ export const setScene = async (canvas) => {
     console.log('Scene initialized with drag controls');
     registerNoteTriggerHandler();
     animationStarted = true;
+    sceneStartTime = performance.now();
     
     await resize();
     await animate();
@@ -1201,9 +1621,19 @@ export const setScene = async (canvas) => {
 export const setBioProjectionEnabled = (enabled) => {
     bioFocusTarget = enabled ? 1 : 0;
     aboutProjectionTarget = enabled ? 1 : 0;
-    if (!enabled) {
+    if (!enabled && !hasProjectedVideoInput()) {
         projectedVideoMixTarget = 0;
     }
+};
+
+export const setCanvasSubtitles = ({ roleText, musicText } = {}) => {
+    if (typeof roleText === 'string' && roleText.trim()) {
+        canvasSubtitleState.roleText = roleText.trim();
+    }
+    if (typeof musicText === 'string' && musicText.trim()) {
+        canvasSubtitleState.musicText = musicText.trim();
+    }
+    rebuildCanvasSubtitles();
 };
 
 export const setProjectOpenHandler = (handler) => {
@@ -1213,27 +1643,17 @@ export const setProjectOpenHandler = (handler) => {
 export const setProjectedVideo = async (url) => {
     if (!url) return false;
     try {
-        if (!projectedVideoEl) {
-            projectedVideoEl = document.createElement('video');
-            projectedVideoEl.crossOrigin = 'anonymous';
-            projectedVideoEl.muted = true;
-            projectedVideoEl.loop = true;
-            projectedVideoEl.playsInline = true;
+        const videoEl = ensureProjectedVideoElement();
+        stopProjectedMediaStreamTracks();
+        videoEl.srcObject = null;
+        if (videoEl.src !== url) {
+            videoEl.src = url;
+            videoEl.load();
         }
-        if (projectedVideoEl.src !== url) {
-            projectedVideoEl.src = url;
-            projectedVideoEl.load();
-        }
-        await projectedVideoEl.play();
-        if (!projectedVideoTexture) {
-            projectedVideoTexture = new THREE.VideoTexture(projectedVideoEl);
-            projectedVideoTexture.minFilter = THREE.LinearFilter;
-            projectedVideoTexture.magFilter = THREE.LinearFilter;
-            if ('colorSpace' in projectedVideoTexture && srgbColorSpace) {
-                projectedVideoTexture.colorSpace = srgbColorSpace;
-            }
-        }
-        SPHERE.material.uniforms.tVideo.value = projectedVideoTexture;
+        await waitForVideoReadiness(videoEl);
+        await tryPlayVideoElement(videoEl);
+        SPHERE.material.uniforms.tVideo.value = ensureProjectedVideoTexture();
+        projectedVideoSourceType = 'url';
         projectedVideoMixTarget = 1;
         return true;
     } catch (error) {
@@ -1242,14 +1662,69 @@ export const setProjectedVideo = async (url) => {
     }
 };
 
-export const clearProjectedVideo = () => {
+export const setProjectedMediaStream = async (stream) => {
+    if (!stream) return false;
+    try {
+        const videoEl = ensureProjectedVideoElement();
+        stopProjectedMediaStreamTracks();
+        videoEl.pause();
+        videoEl.removeAttribute('src');
+        videoEl.srcObject = stream;
+        projectedMediaStream = stream;
+        resetProjectedFaceState();
+        await waitForVideoReadiness(videoEl);
+        await tryPlayVideoElement(videoEl);
+        SPHERE.material.uniforms.tVideo.value = ensureProjectedStreamTexture();
+        projectedVideoSourceType = 'stream';
+        projectedVideoMixTarget = 1;
+        return true;
+    } catch (error) {
+        console.warn('Projected media stream start failed:', error);
+        stopProjectedMediaStreamTracks();
+        if (projectedVideoEl) {
+            projectedVideoEl.srcObject = null;
+        }
+        projectedVideoSourceType = null;
+        return false;
+    }
+};
+
+export const clearProjectedMediaStream = () => {
+    if (projectedVideoSourceType !== 'stream') return;
+    projectedVideoSourceType = null;
     projectedVideoMixTarget = 0;
     SPHERE.material.uniforms.tVideo.value = fallbackVideoTexture;
     if (projectedVideoEl) {
         projectedVideoEl.pause();
+        projectedVideoEl.srcObject = null;
+    }
+    if (projectedStreamTexture) {
+        projectedStreamTexture.dispose();
+        projectedStreamTexture = null;
+    }
+    projectedStreamCanvas = null;
+    projectedStreamCanvasCtx = null;
+    projectedFaceDetectCanvas = null;
+    projectedFaceDetectCtx = null;
+    resetProjectedFaceState();
+    stopProjectedMediaStreamTracks();
+};
+
+export const clearProjectedVideo = () => {
+    if (projectedVideoSourceType === 'stream') {
+        clearProjectedMediaStream();
+        return;
+    }
+    projectedVideoSourceType = null;
+    projectedVideoMixTarget = 0;
+    SPHERE.material.uniforms.tVideo.value = fallbackVideoTexture;
+    if (projectedVideoEl) {
+        projectedVideoEl.pause();
+        projectedVideoEl.srcObject = null;
         projectedVideoEl.removeAttribute('src');
         projectedVideoEl.load();
     }
+    stopProjectedMediaStreamTracks();
 };
 
 const onCanvasMouseEnter = () => {
@@ -1258,6 +1733,7 @@ const onCanvasMouseEnter = () => {
 
 export const destroyScene = () => {
     animationStarted = false;
+    sceneStartTime = 0;
 
     if (animationFrameId) {
         cancelAnimationFrame(animationFrameId);
@@ -1289,5 +1765,16 @@ export const destroyScene = () => {
     unregisterNoteTriggerHandler();
     if (audioSystem && typeof audioSystem.detachComputerKeyboard === 'function') {
         audioSystem.detachComputerKeyboard();
+    }
+    clearProjectedVideo();
+    if (canvasSubtitleSprites.role) {
+        CAMERA.remove(canvasSubtitleSprites.role);
+        disposeSpriteTexture(canvasSubtitleSprites.role);
+        canvasSubtitleSprites.role = null;
+    }
+    if (canvasSubtitleSprites.music) {
+        CAMERA.remove(canvasSubtitleSprites.music);
+        disposeSpriteTexture(canvasSubtitleSprites.music);
+        canvasSubtitleSprites.music = null;
     }
 };

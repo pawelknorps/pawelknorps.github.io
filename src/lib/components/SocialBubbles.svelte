@@ -95,9 +95,10 @@
 	}
 
 	.knorp-mark {
+		font-family: var(--font-label);
 		font-size: 1rem;
-		font-weight: 800;
-		letter-spacing: 0.12em;
+		font-weight: 700;
+		letter-spacing: 0.05em;
 	}
 
 	/* Stagger animation for bubbles */

@@ -149,8 +149,8 @@
 		margin: 0;
 		font-family: var(--font-display);
 		font-size: var(--step-1);
-		letter-spacing: 0.03em;
-		font-weight: 700;
+		letter-spacing: 0.008em;
+		font-weight: 600;
 		color: var(--text-1);
 	}
 
@@ -158,7 +158,7 @@
 		margin: 0.2rem 0 0;
 		font-family: var(--font-label);
 		font-size: var(--step--1);
-		letter-spacing: 0.14em;
+		letter-spacing: 0.07em;
 		opacity: 0.75;
 		color: var(--text-2);
 		text-transform: uppercase;
@@ -172,7 +172,7 @@
 		padding: 0.4rem 0.8rem;
 		font-family: var(--font-label);
 		font-size: var(--step--1);
-		letter-spacing: 0.12em;
+		letter-spacing: 0.06em;
 		cursor: pointer;
 		text-transform: uppercase;
 	}

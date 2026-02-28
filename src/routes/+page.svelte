@@ -747,7 +747,7 @@
 	.audio-notice {
 		animation: gentlePulse 2s ease-in-out infinite;
 		font-family: var(--font-label);
-		letter-spacing: 0.14em;
+		letter-spacing: 0.06em;
 		text-transform: uppercase;
 		background: linear-gradient(140deg, rgba(7, 14, 29, 0.92), rgba(15, 23, 42, 0.82));
 		border: 1px solid var(--stroke-soft);

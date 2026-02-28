@@ -149,7 +149,7 @@
 							{data.description}
 						</h2>
 
-						<div class="flex flex-wrap gap-3 mb-4">
+						<div class="project-tags flex flex-wrap gap-3 mb-4">
 							{#if data.features}
 								{#each data.features as feature}
 									<span
@@ -245,7 +245,7 @@
 							{data.description}
 						</h2>
 
-						<div class="flex flex-wrap gap-3 mb-4">
+						<div class="project-tags flex flex-wrap gap-3 mb-4">
 							{#if data.features}
 								{#each data.features as feature}
 									<span
@@ -326,7 +326,7 @@
 							{data.description}
 						</h2>
 
-						<div class="flex flex-wrap gap-3 mb-4">
+						<div class="project-tags flex flex-wrap gap-3 mb-4">
 							{#if data.features}
 								{#each data.features as feature}
 									<span
@@ -384,7 +384,7 @@
 						>
 							{data.description}
 						</h2>
-						<div class="flex flex-wrap gap-3">
+						<div class="project-tags flex flex-wrap gap-3">
 							{#if data.features}
 								{#each data.features as feature}
 									<span
@@ -439,7 +439,7 @@
 						>
 							{data.description}
 						</h2>
-						<div class="flex flex-wrap gap-3">
+						<div class="project-tags flex flex-wrap gap-3">
 							{#if data.features}
 								{#each data.features as feature}
 									<span
@@ -492,7 +492,7 @@
 						>
 							{data.description}
 						</h2>
-						<div class="flex flex-wrap gap-3">
+						<div class="project-tags flex flex-wrap gap-3">
 							{#if data.technologies}
 								{#each data.technologies as topic}
 									<span
@@ -531,7 +531,7 @@
 						>
 							{data.description}
 						</h2>
-						<div class="flex flex-wrap gap-3">
+						<div class="project-tags flex flex-wrap gap-3">
 							{#if data.technologies}
 								{#each data.technologies as topic}
 									<span
@@ -551,6 +551,10 @@
 <style>
 	.project-group {
 		background: transparent;
+	}
+
+	.project-tags {
+		display: none;
 	}
 
 	.project-card {
@@ -608,23 +612,23 @@
 
 	.project-card .adaptive-text {
 		font-family: var(--font-display);
-		font-size: var(--step-2);
-		font-weight: 700;
-		line-height: 1.2;
-		letter-spacing: 0.02em;
+		font-size: var(--step-1);
+		font-weight: 600;
+		line-height: 1.28;
+		letter-spacing: 0.008em;
 	}
 
 	.project-card .adaptive-subtext {
 		font-family: var(--font-body);
-		font-size: var(--step-0);
-		line-height: 1.72;
+		font-size: var(--step--1);
+		line-height: 1.68;
 		color: var(--text-2);
 		letter-spacing: 0.01em;
 	}
 
 	.project-group h3 {
 		font-family: var(--font-label);
-		letter-spacing: 0.16em;
+		letter-spacing: 0.08em;
 		font-size: var(--step-3);
 		text-transform: uppercase;
 	}
@@ -632,7 +636,7 @@
 	.project-group span {
 		font-family: var(--font-label);
 		font-size: var(--step--1);
-		letter-spacing: 0.14em;
+		letter-spacing: 0.06em;
 		border-radius: 999px;
 		border-color: rgba(255, 78, 163, 0.45);
 		color: #ff6db5;
@@ -653,7 +657,7 @@
 
 	.project-group a {
 		font-family: var(--font-label);
-		letter-spacing: 0.12em;
+		letter-spacing: 0.06em;
 		border-bottom: 1px solid rgba(255, 78, 163, 0.28);
 		color: #cedaf5;
 	}
@@ -682,11 +686,11 @@
 
 	@media (max-width: 900px) {
 		.project-card .adaptive-text {
-			font-size: var(--step-1);
+			font-size: var(--step-0);
 		}
 
 		.project-card .adaptive-subtext {
-			font-size: var(--step--1);
+			font-size: 0.78rem;
 		}
 	}
 </style>

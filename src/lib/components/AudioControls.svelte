@@ -288,7 +288,7 @@
         font-family: var(--font-label);
         font-size: var(--step--1);
         text-transform: uppercase;
-        letter-spacing: 0.14em;
+        letter-spacing: 0.06em;
         border: 1px solid var(--stroke-soft);
         color: var(--text-2);
         background: linear-gradient(140deg, rgba(10, 17, 33, 0.78), rgba(5, 9, 20, 0.66));
@@ -319,7 +319,7 @@
     .control-mini {
         font-family: var(--font-label);
         font-size: 0.62rem;
-        letter-spacing: 0.12em;
+        letter-spacing: 0.05em;
         text-transform: uppercase;
         border: 1px solid var(--stroke-soft);
         border-radius: 0.55rem;

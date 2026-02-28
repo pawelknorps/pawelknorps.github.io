@@ -37,15 +37,16 @@
     margin: 0.8rem 0 0;
     font-family: var(--font-display);
     font-size: var(--step-4);
-    line-height: 1.1;
-    letter-spacing: 0.02em;
+    line-height: 1.16;
+    letter-spacing: 0.01em;
+    font-weight: 600;
   }
 
   .back-link {
     color: var(--accent-cyan);
     font-family: var(--font-label);
     font-size: var(--step--1);
-    letter-spacing: 0.12em;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     text-decoration: none;
     border-bottom: 1px solid rgba(143, 214, 255, 0.42);
@@ -86,7 +87,7 @@
     margin: 0;
     font-family: var(--font-label);
     font-size: var(--step--1);
-    letter-spacing: 0.14em;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     color: #ff7fbe;
   }
@@ -95,6 +96,8 @@
     margin: 0.45rem 0 0;
     font-family: var(--font-display);
     font-size: var(--step-2);
-    line-height: 1.25;
+    line-height: 1.3;
+    letter-spacing: 0.006em;
+    font-weight: 600;
   }
 </style>

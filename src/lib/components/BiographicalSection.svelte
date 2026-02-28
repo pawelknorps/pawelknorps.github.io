@@ -91,7 +91,7 @@
 	.bio-title {
 		margin: 0;
 		font-size: var(--step--1);
-		font-weight: 800;
+		font-weight: 600;
 		color: var(--text-2);
 	}
 
@@ -100,11 +100,11 @@
 	}
 
 	.bio-text p {
-		text-align: justify;
+		text-align: left;
 		font-weight: 400;
-		font-size: var(--step-1);
-		line-height: 1.82;
-		letter-spacing: 0.005em;
+		font-size: clamp(0.86rem, 0.83rem + 0.12vw, 0.96rem);
+		line-height: 1.72;
+		letter-spacing: 0.002em;
 		margin: 0 auto 1rem;
 		max-width: 58ch;
 		padding-right: 0.25rem;
@@ -152,8 +152,8 @@
 
 	@media (min-width: 1536px) {
 		.bio-text {
-			font-size: 1.03rem;
-			line-height: 1.9;
+			font-size: 1rem;
+			line-height: 1.84;
 		}
 	}
 

@@ -203,7 +203,7 @@
     color: var(--accent-cyan);
     font-family: var(--font-label);
     font-size: var(--step--1);
-    letter-spacing: 0.12em;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     border-bottom: 1px solid rgba(143, 214, 255, 0.42);
     text-decoration: none;
@@ -222,7 +222,7 @@
     margin-bottom: 0.9rem;
     font-family: var(--font-label);
     font-size: var(--step--1);
-    letter-spacing: 0.12em;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--text-3);
   }
@@ -247,7 +247,7 @@
 
   .project-category {
     font-family: var(--font-label);
-    letter-spacing: 0.18em;
+    letter-spacing: 0.08em;
     font-size: var(--step--1);
     text-transform: uppercase;
     color: #ff8bc8;
@@ -257,15 +257,16 @@
     margin: 0.3rem 0;
     font-family: var(--font-display);
     font-size: var(--step-5);
-    line-height: 1.05;
-    letter-spacing: 0.01em;
+    line-height: 1.12;
+    letter-spacing: 0.008em;
+    font-weight: 600;
   }
 
   h2 {
     margin: 1.6rem 0 0.7rem;
     font-family: var(--font-label);
     font-size: var(--step-0);
-    letter-spacing: 0.12em;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     color: #b9d8ff;
   }
@@ -313,7 +314,7 @@
     display: inline-flex;
     font-family: var(--font-label);
     font-size: var(--step--1);
-    letter-spacing: 0.12em;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--accent-cyan);
     text-decoration: none;
@@ -359,7 +360,7 @@
     font-family: var(--font-label);
     font-size: var(--step--1);
     text-transform: uppercase;
-    letter-spacing: 0.14em;
+    letter-spacing: 0.06em;
     color: #ff8bc8;
   }
 
@@ -368,6 +369,8 @@
     font-family: var(--font-display);
     font-size: var(--step-1);
     line-height: 1.35;
+    letter-spacing: 0.006em;
+    font-weight: 600;
   }
 
   @media (max-width: 700px) {

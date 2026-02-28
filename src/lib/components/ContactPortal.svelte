@@ -192,7 +192,7 @@
 
   .portal-kicker {
     font-family: var(--font-label);
-    letter-spacing: 0.16em;
+    letter-spacing: 0.08em;
     font-size: var(--step--1);
     color: var(--text-3);
     margin-bottom: 0.2rem;
@@ -201,8 +201,9 @@
   .portal-title {
     font-family: var(--font-display);
     font-size: var(--step-2);
-    line-height: 1.1;
-    letter-spacing: 0.02em;
+    line-height: 1.18;
+    letter-spacing: 0.008em;
+    font-weight: 600;
     margin: 0 0 0.4rem;
     color: var(--text-1);
   }
@@ -226,7 +227,7 @@
   label span {
     font-family: var(--font-label);
     font-size: var(--step--1);
-    letter-spacing: 0.12em;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--text-3);
   }
@@ -257,7 +258,7 @@
     background: linear-gradient(135deg, rgba(255, 78, 163, 0.28), rgba(125, 90, 255, 0.18));
     border-radius: var(--radius-sm);
     padding: 0.58rem 0.9rem;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.05em;
     text-transform: uppercase;
     font-family: var(--font-label);
     font-size: var(--step--1);

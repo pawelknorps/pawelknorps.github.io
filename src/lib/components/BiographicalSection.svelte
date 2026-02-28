@@ -19,11 +19,11 @@
 <div class="biographical-text">
 	<div class="bio-flow-container" style="opacity: {bioOpacity}; min-height: 5rem;">
 		<div class="bio-title-overlay">
-			<h3 class="bio-title">O MNIE</h3>
+			<h3 class="bio-title typ-label">O MNIE</h3>
 		</div>
 
 		<div
-			class="bio-text text-base xl:text-mds leading-relaxed space-y-8 adaptive-subtext"
+			class="bio-text typ-body text-base xl:text-mds leading-relaxed space-y-8 adaptive-subtext"
 			class:text-gray-300={adaptiveSubTextClass === 'text-gray-300'}
 			class:text-gray-200={adaptiveSubTextClass === 'text-gray-200'}
 			class:text-gray-700={adaptiveSubTextClass === 'text-gray-700'}
@@ -65,17 +65,17 @@
 		margin-top: 20rem;
 		top: 2rem;
 		padding: clamp(1.25rem, 2vw, 2rem);
-		transition: opacity 0.9s cubic-bezier(0.4, 0, 0.2, 1);
-		backdrop-filter: blur(16px) saturate(165%);
+		transition: opacity var(--dur-slow) var(--ease-std);
+		backdrop-filter: blur(var(--glass-blur)) saturate(165%);
 		background:
-			radial-gradient(circle at 8% 15%, rgba(255, 51, 143, 0.26), transparent 35%),
-			radial-gradient(circle at 86% 5%, rgba(81, 135, 255, 0.3), transparent 30%),
-			linear-gradient(135deg, rgba(16, 18, 30, 0.72), rgba(9, 11, 20, 0.84));
-		border: 1px solid rgba(255, 255, 255, 0.14);
+			radial-gradient(circle at 8% 15%, rgba(255, 78, 163, 0.24), transparent 35%),
+			radial-gradient(circle at 86% 5%, rgba(105, 162, 255, 0.28), transparent 34%),
+			linear-gradient(135deg, rgba(13, 17, 32, 0.76), rgba(7, 11, 24, 0.88));
+		border: 1px solid var(--stroke-soft);
 		box-shadow:
-			0 24px 64px rgba(0, 0, 0, 0.38),
-			inset 0 1px 0 rgba(255, 255, 255, 0.22);
-		border-radius: 24px;
+			var(--shadow-soft),
+			inset 0 1px 0 rgba(255, 255, 255, 0.18);
+		border-radius: var(--radius-lg);
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;
@@ -85,16 +85,14 @@
 	.bio-title-overlay {
 		position: relative;
 		padding: 0.25rem 0.4rem 0.55rem;
-		border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+		border-bottom: 1px solid var(--stroke-soft);
 	}
 
 	.bio-title {
 		margin: 0;
-		font-size: 0.86rem;
-		letter-spacing: 0.22em;
-		font-weight: 600;
-		text-transform: uppercase;
-		color: rgba(244, 246, 252, 0.86);
+		font-size: var(--step--1);
+		font-weight: 800;
+		color: var(--text-2);
 	}
 
 	.bio-text {
@@ -103,11 +101,14 @@
 
 	.bio-text p {
 		text-align: justify;
-		font-family: 'IBM Plex Sans', 'Manrope', 'Sora', system-ui, -apple-system, sans-serif;
-		font-weight: 340;
-		line-height: 1.85;
-		margin-bottom: 1rem;
+		font-weight: 400;
+		font-size: var(--step-1);
+		line-height: 1.82;
+		letter-spacing: 0.005em;
+		margin: 0 auto 1rem;
+		max-width: 58ch;
 		padding-right: 0.25rem;
+		color: var(--text-2);
 	}
 
 	.bio-text span {
@@ -115,23 +116,27 @@
 	}
 
 	.bio-contact-trigger {
-		border: 0;
+		border: 1px solid transparent;
 		background: transparent;
-		padding: 0;
-		color: #ff6eb9;
+		padding: 0.05rem 0.18rem;
+		margin-left: -0.18rem;
+		border-radius: 0.35rem;
+		color: var(--accent-pink);
 		font: inherit;
 		font-weight: 600;
 		text-decoration: underline;
-		text-decoration-color: rgba(255, 110, 185, 0.5);
+		text-decoration-color: var(--accent-pink-soft);
 		text-underline-offset: 0.18rem;
 		cursor: pointer;
 		pointer-events: auto;
-		transition: color 0.2s ease, text-decoration-color 0.2s ease;
+		transition: color var(--dur-fast) var(--ease-std), text-decoration-color var(--dur-fast) var(--ease-std), border-color var(--dur-fast) var(--ease-std), background-color var(--dur-fast) var(--ease-std);
 	}
 
 	.bio-contact-trigger:hover {
-		color: #ffd6eb;
-		text-decoration-color: rgba(255, 214, 235, 0.9);
+		color: #ffd6ec;
+		text-decoration-color: rgba(255, 214, 236, 0.9);
+		background: rgba(255, 78, 163, 0.12);
+		border-color: rgba(255, 78, 163, 0.35);
 	}
 
 	.bio-contact-wrap {
@@ -139,7 +144,7 @@
 	}
 
 	.adaptive-subtext {
-		transition: color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+		transition: color var(--dur-med) var(--ease-std);
 		text-shadow:
 			0 0 10px rgba(0, 0, 0, 0.45),
 			0 1px 4px rgba(0, 0, 0, 0.36);
@@ -147,8 +152,8 @@
 
 	@media (min-width: 1536px) {
 		.bio-text {
-			font-size: 1.07rem;
-			line-height: 1.95;
+			font-size: 1.03rem;
+			line-height: 1.9;
 		}
 	}
 

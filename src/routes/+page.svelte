@@ -722,7 +722,7 @@
 	.seamless-flow {
 		background: transparent;
 		position: relative;
-		z-index: 10; /* Higher z-index for content */
+		z-index: 10;
 		pointer-events: none;
 	}
 
@@ -746,6 +746,13 @@
 	/* Simple audio notice */
 	.audio-notice {
 		animation: gentlePulse 2s ease-in-out infinite;
+		font-family: var(--font-label);
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		background: linear-gradient(140deg, rgba(7, 14, 29, 0.92), rgba(15, 23, 42, 0.82));
+		border: 1px solid var(--stroke-soft);
+		box-shadow: var(--shadow-soft);
+		color: var(--text-1);
 	}
 
 	@keyframes gentlePulse {
@@ -769,30 +776,33 @@
 
 	/* Text selection styling */
 	::selection {
-		background-color: #FF0080;
+		background-color: var(--accent-pink);
 		color: white;
 	}
-	   .gradient-placeholder {
-        background: linear-gradient(-45deg, #0f0f0f, #1a1a1a, #2a2a2a, #3a3a3a);
-        background-size: 400% 400%;
-        animation: gradient-animation 15s ease infinite;
-    }
 
-    @keyframes gradient-animation {
-        0% {
-            background-position: 0% 50%;
-        }
-        50% {
-            background-position: 100% 50%;
-        }
-        100% {
-            background-position: 0% 50%;
-        }
-    }
+	.gradient-placeholder {
+		background:
+			radial-gradient(circle at 20% 18%, rgba(124, 176, 255, 0.2), transparent 36%),
+			radial-gradient(circle at 82% 14%, rgba(255, 88, 175, 0.17), transparent 34%),
+			linear-gradient(-35deg, #070a14, #0a1022 45%, #101930);
+		background-size: 100% 100%;
+		animation: drift-gradient 15s var(--ease-std) infinite;
+	}
 
-	/* Remove any visual separations */
-	* {
-		border: none;
-		outline: none;
+	@keyframes drift-gradient {
+		0% {
+			filter: saturate(100%);
+			transform: scale(1);
+		}
+
+		50% {
+			filter: saturate(120%);
+			transform: scale(1.02);
+		}
+
+		100% {
+			filter: saturate(100%);
+			transform: scale(1);
+		}
 	}
 </style>

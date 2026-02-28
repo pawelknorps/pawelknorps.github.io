@@ -122,18 +122,18 @@
 		padding: clamp(1rem, 3vw, 2rem);
 		background:
 			radial-gradient(circle at 12% 10%, rgba(82, 154, 255, 0.24), transparent 35%),
-			radial-gradient(circle at 85% 85%, rgba(255, 51, 148, 0.23), transparent 40%),
+			radial-gradient(circle at 85% 85%, rgba(255, 78, 163, 0.24), transparent 40%),
 			rgba(3, 7, 16, 0.74);
-		backdrop-filter: blur(20px);
+		backdrop-filter: blur(20px) saturate(140%);
 	}
 
 	.media-shell {
 		width: min(1120px, 100%);
-		border-radius: 18px;
+		border-radius: var(--radius-lg);
 		overflow: hidden;
-		border: 1px solid rgba(255, 255, 255, 0.18);
-		background: rgba(8, 12, 24, 0.88);
-		box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+		border: 1px solid var(--stroke-strong);
+		background: linear-gradient(140deg, rgba(8, 12, 24, 0.9), rgba(10, 15, 29, 0.84));
+		box-shadow: var(--shadow-lg);
 	}
 
 	.media-topbar {
@@ -142,35 +142,44 @@
 		align-items: center;
 		gap: 1rem;
 		padding: 0.85rem 1rem;
-		border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+		border-bottom: 1px solid var(--stroke-soft);
 	}
 
 	.media-meta h3 {
 		margin: 0;
-		font-size: 0.95rem;
-		letter-spacing: 0.05em;
+		font-family: var(--font-display);
+		font-size: var(--step-1);
+		letter-spacing: 0.03em;
 		font-weight: 700;
-		color: #f1f6ff;
+		color: var(--text-1);
 	}
 
 	.media-meta p {
 		margin: 0.2rem 0 0;
-		font-size: 0.7rem;
-		letter-spacing: 0.1em;
+		font-family: var(--font-label);
+		font-size: var(--step--1);
+		letter-spacing: 0.14em;
 		opacity: 0.75;
-		color: #e0ecff;
+		color: var(--text-2);
 		text-transform: uppercase;
 	}
 
 	.media-close {
-		border: 1px solid rgba(255, 255, 255, 0.28);
+		border: 1px solid rgba(255, 78, 163, 0.5);
 		background: rgba(9, 19, 37, 0.8);
-		color: #f4f9ff;
+		color: #ffe7f3;
 		border-radius: 999px;
 		padding: 0.4rem 0.8rem;
-		font-size: 0.72rem;
-		letter-spacing: 0.08em;
+		font-family: var(--font-label);
+		font-size: var(--step--1);
+		letter-spacing: 0.12em;
 		cursor: pointer;
+		text-transform: uppercase;
+	}
+
+	.media-close:hover {
+		background: rgba(255, 78, 163, 0.2);
+		border-color: rgba(255, 78, 163, 0.7);
 	}
 
 	.media-body {
@@ -200,12 +209,12 @@
 		place-content: center;
 		gap: 0.8rem;
 		text-align: center;
-		color: #f0f6ff;
+		color: var(--text-1);
 		padding: 1.25rem;
 	}
 
 	.media-fallback a {
-		color: #8dd2ff;
+		color: var(--accent-cyan);
 		text-decoration: underline;
 	}
 	@media (max-width: 900px) {

@@ -99,7 +99,7 @@
 
 			<div
 				id="music-{i}"
-				class="group my-20 translate-y-0 hover:-translate-y-8 duration-[400ms] ease-in-out w-full md:max-w-[40rem] lg:max-w-[48rem] xl:max-w-[56rem] 2xl:max-w-[64rem] project-card pointer-events-auto"
+				class="group my-20 translate-y-0 hover:-translate-y-4 duration-[400ms] ease-in-out w-full md:max-w-[40rem] lg:max-w-[48rem] xl:max-w-[56rem] 2xl:max-w-[64rem] project-card pointer-events-auto"
 				in:fade={{ delay: 250 * i, duration: 1000 }}
 			>
 				{#if youtubeId}
@@ -471,7 +471,7 @@
 		{#each programmingProjects as data, i}
 			<div
 				id="programming-{i}"
-				class="group my-20 translate-y-0 hover:-translate-y-8 duration-[400ms] ease-in-out w-full md:max-w-[40rem] lg:max-w-[48rem] xl:max-w-[56rem] 2xl:max-w-[64rem] project-card pointer-events-auto"
+				class="group my-20 translate-y-0 hover:-translate-y-4 duration-[400ms] ease-in-out w-full md:max-w-[40rem] lg:max-w-[48rem] xl:max-w-[56rem] 2xl:max-w-[64rem] project-card pointer-events-auto"
 				in:fade={{
 					delay: 250 * (i + musicProjects.length),
 					duration: 1000,
@@ -553,25 +553,27 @@
 		background: transparent;
 	}
 
-	/* Enhanced project interactions */
-	.project-group .group:hover {
-		transform: translateY(-2rem) scale(1.02);
-	}
-
-	/* Project card highlight animation */
 	.project-card {
 		will-change: transform;
-		transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-		border-radius: 16px;
-		padding: 1.5rem;
+		transition:
+			transform var(--dur-med) var(--ease-emph),
+			border-color var(--dur-fast) var(--ease-std),
+			box-shadow var(--dur-fast) var(--ease-std),
+			background var(--dur-fast) var(--ease-std);
+		border-radius: var(--radius-lg);
+		padding: clamp(1.15rem, 2.2vw, 1.8rem);
 		position: relative;
-		backdrop-filter: blur(12px);
-		-webkit-backdrop-filter: blur(12px);
-		background: rgba(20, 20, 20, 0.4);
-		border: 1px solid rgba(255, 255, 255, 0.08);
+		backdrop-filter: blur(var(--glass-blur));
+		-webkit-backdrop-filter: blur(var(--glass-blur));
+		background:
+			radial-gradient(circle at 0% 0%, rgba(255, 78, 163, 0.12), transparent 30%),
+			radial-gradient(circle at 100% 100%, rgba(143, 214, 255, 0.08), transparent 35%),
+			linear-gradient(140deg, rgba(12, 17, 32, 0.72), rgba(10, 14, 28, 0.84));
+		border: 1px solid var(--stroke-soft);
 		box-shadow:
-			0 4px 24px -1px rgba(0, 0, 0, 0.2),
+			0 14px 36px -12px rgba(0, 0, 0, 0.45),
 			0 0 0 1px rgba(255, 255, 255, 0.02) inset;
+		overflow: hidden;
 	}
 
 	.project-card::before {
@@ -583,20 +585,20 @@
 		bottom: 0;
 		background: linear-gradient(
 			135deg,
-			rgba(255, 0, 128, 0.15),
-			rgba(255, 255, 255, 0.05)
+			rgba(255, 78, 163, 0.2),
+			rgba(255, 255, 255, 0.06)
 		);
-		border-radius: 16px;
+		border-radius: var(--radius-lg);
 		opacity: 0;
-		transition: opacity 0.4s ease;
+		transition: opacity var(--dur-med) var(--ease-std);
 		z-index: -1;
 		pointer-events: none;
 	}
 
 	.project-card:hover {
-		border-color: rgba(255, 255, 255, 0.2);
+		border-color: var(--stroke-strong);
 		box-shadow:
-			0 20px 40px -5px rgba(0, 0, 0, 0.4),
+			0 24px 54px -14px rgba(0, 0, 0, 0.55),
 			0 0 0 1px rgba(255, 255, 255, 0.1) inset;
 	}
 
@@ -604,30 +606,87 @@
 		opacity: 1;
 	}
 
-	/* Subtle hover effects for tags */
-	.project-group span:hover {
-		background: rgba(255, 0, 128, 0.2);
-		border-color: rgba(255, 0, 128, 0.8);
-		color: white;
-		box-shadow: 0 0 15px rgba(255, 0, 128, 0.4);
+	.project-card .adaptive-text {
+		font-family: var(--font-display);
+		font-size: var(--step-2);
+		font-weight: 700;
+		line-height: 1.2;
+		letter-spacing: 0.02em;
 	}
 
-	/* Adaptive text colors with smooth transitions */
+	.project-card .adaptive-subtext {
+		font-family: var(--font-body);
+		font-size: var(--step-0);
+		line-height: 1.72;
+		color: var(--text-2);
+		letter-spacing: 0.01em;
+	}
+
+	.project-group h3 {
+		font-family: var(--font-label);
+		letter-spacing: 0.16em;
+		font-size: var(--step-3);
+		text-transform: uppercase;
+	}
+
+	.project-group span {
+		font-family: var(--font-label);
+		font-size: var(--step--1);
+		letter-spacing: 0.14em;
+		border-radius: 999px;
+		border-color: rgba(255, 78, 163, 0.45);
+		color: #ff6db5;
+		background: rgba(255, 78, 163, 0.08);
+		transition:
+			background var(--dur-fast) var(--ease-std),
+			border-color var(--dur-fast) var(--ease-std),
+			color var(--dur-fast) var(--ease-std),
+			box-shadow var(--dur-fast) var(--ease-std);
+	}
+
+	.project-group span:hover {
+		background: rgba(255, 78, 163, 0.2);
+		border-color: rgba(255, 78, 163, 0.84);
+		color: white;
+		box-shadow: 0 0 18px rgba(255, 78, 163, 0.42);
+	}
+
+	.project-group a {
+		font-family: var(--font-label);
+		letter-spacing: 0.12em;
+		border-bottom: 1px solid rgba(255, 78, 163, 0.28);
+		color: #cedaf5;
+	}
+
+	.project-group a:hover {
+		color: var(--accent-pink);
+		border-bottom-color: var(--accent-pink);
+	}
+
 	.adaptive-text,
 	.adaptive-subtext {
-		transition: color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+		transition: color var(--dur-med) var(--ease-std);
 	}
 
 	.adaptive-text {
 		text-shadow:
-			0 0 20px rgba(0, 0, 0, 0.5),
-			0 2px 4px rgba(0, 0, 0, 0.3);
-		letter-spacing: -0.02em;
+			0 8px 24px rgba(0, 0, 0, 0.46),
+			0 2px 4px rgba(0, 0, 0, 0.32);
 	}
 
 	.adaptive-subtext {
 		text-shadow:
-			0 0 10px rgba(0, 0, 0, 0.5),
+			0 0 12px rgba(0, 0, 0, 0.42),
 			0 1px 2px rgba(0, 0, 0, 0.3);
+	}
+
+	@media (max-width: 900px) {
+		.project-card .adaptive-text {
+			font-size: var(--step-1);
+		}
+
+		.project-card .adaptive-subtext {
+			font-size: var(--step--1);
+		}
 	}
 </style>

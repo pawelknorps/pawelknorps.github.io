@@ -34,7 +34,7 @@
 
 		ctx.shadowColor = 'rgba(255, 54, 156, 0.52)';
 		ctx.shadowBlur = 56;
-		ctx.font = '900 320px "Sora", "Space Grotesk", sans-serif';
+		ctx.font = '700 320px "Knorps Display", "Iowan Old Style", serif';
 		ctx.fillStyle = gradient;
 		ctx.fillText('O MNIE', c.width / 2, c.height / 2 + 8);
 

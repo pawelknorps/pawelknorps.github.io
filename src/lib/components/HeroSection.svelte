@@ -15,7 +15,7 @@
 	<div class="group z-10">
 		<button
 			type="button"
-			class="text-[4rem] font-black tracking-widest ml-20 adaptive-text title-toggle"
+			class="hero-title ml-6 md:ml-20 adaptive-text title-toggle typ-display"
 			class:focus-active={bioFocusEnabled}
 			class:audio-live={isAudioEnabled}
 			style:--audio-intensity={audioIntensity}
@@ -26,7 +26,7 @@
 			{personalData?.name || 'Paweł Knorps'}
 		</button>
 		<h2
-			class="text-2xl xl:text-3xl 2xl:text-4xl font-thin tracking-widest mt-6 text-center md:text-left md:ml-20 adaptive-text"
+			class="hero-subtitle mt-6 text-center md:text-left md:ml-20 adaptive-text typ-body"
 			class:text-white={adaptiveTextClass === "text-white"}
 			class:text-gray-900={adaptiveTextClass === "text-gray-900"}
 		>
@@ -46,11 +46,10 @@
 
 	/* Adaptive text colors with smooth transitions */
 	.adaptive-text {
-		transition: color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+		transition: color var(--dur-med) var(--ease-std);
 		text-shadow:
-			0 0 20px rgba(0, 0, 0, 0.5),
-			0 2px 4px rgba(0, 0, 0, 0.3);
-		letter-spacing: -0.02em;
+			0 8px 24px rgba(0, 0, 0, 0.45),
+			0 2px 6px rgba(0, 0, 0, 0.34);
 	}
 
 	.title-toggle {
@@ -62,7 +61,21 @@
 		cursor: pointer;
 		pointer-events: auto;
 		user-select: none;
-		transition: transform 0.25s ease, text-shadow 0.25s ease, letter-spacing 0.25s ease;
+		transition: transform var(--dur-fast) var(--ease-emph), text-shadow var(--dur-fast) var(--ease-emph), letter-spacing var(--dur-fast) var(--ease-emph);
+	}
+
+	.hero-title {
+		font-size: var(--step-6);
+		line-height: 0.9;
+		letter-spacing: 0.02em;
+	}
+
+	.hero-subtitle {
+		font-size: var(--step-2);
+		font-weight: 400;
+		letter-spacing: 0.1em;
+		max-width: 28ch;
+		color: var(--text-2);
 	}
 
 	.title-toggle:hover {
@@ -86,7 +99,7 @@
 	}
 
 	.title-toggle.focus-active {
-		letter-spacing: 0.16em;
+		letter-spacing: 0.1em;
 		text-shadow:
 			0 0 14px rgba(90, 200, 255, 0.9),
 			0 0 28px rgba(80, 120, 255, 0.55),
@@ -100,6 +113,15 @@
 			0 0 calc(24px + var(--audio-intensity) * 30px)
 				rgba(110, 200, 255, calc(0.28 + var(--audio-intensity) * 0.42)),
 			0 2px 2px rgba(0, 0, 0, 0.56);
+	}
+
+	@media (max-width: 900px) {
+		.hero-subtitle {
+			font-size: var(--step-1);
+			letter-spacing: 0.08em;
+			padding: 0 1rem;
+			max-width: none;
+		}
 	}
 
 </style>

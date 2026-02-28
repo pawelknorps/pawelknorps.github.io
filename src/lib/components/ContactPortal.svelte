@@ -179,32 +179,38 @@
   }
 
   .portal-shell {
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    background: rgba(10, 14, 25, 0.56);
-    backdrop-filter: blur(10px);
-    border-radius: 14px;
-    padding: 1rem;
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+    border: 1px solid var(--stroke-soft);
+    background:
+      radial-gradient(circle at 8% 14%, rgba(255, 78, 163, 0.16), transparent 35%),
+      radial-gradient(circle at 90% 2%, rgba(143, 214, 255, 0.14), transparent 34%),
+      linear-gradient(140deg, rgba(11, 16, 30, 0.78), rgba(9, 14, 28, 0.72));
+    backdrop-filter: blur(var(--glass-blur));
+    border-radius: var(--radius-md);
+    padding: clamp(0.95rem, 1.7vw, 1.2rem);
+    box-shadow: var(--shadow-soft);
   }
 
   .portal-kicker {
-    letter-spacing: 0.14em;
-    font-size: 0.64rem;
-    color: rgba(202, 214, 236, 0.78);
+    font-family: var(--font-label);
+    letter-spacing: 0.16em;
+    font-size: var(--step--1);
+    color: var(--text-3);
     margin-bottom: 0.2rem;
   }
 
   .portal-title {
-    font-size: 1.1rem;
+    font-family: var(--font-display);
+    font-size: var(--step-2);
+    line-height: 1.1;
     letter-spacing: 0.02em;
     margin: 0 0 0.4rem;
-    color: rgba(244, 248, 255, 0.96);
+    color: var(--text-1);
   }
 
   .portal-copy {
-    color: rgba(208, 220, 241, 0.9);
+    color: var(--text-2);
     margin-bottom: 0.8rem;
-    font-size: 0.92rem;
+    font-size: var(--step-0);
   }
 
   .portal-form {
@@ -218,44 +224,50 @@
   }
 
   label span {
-    font-size: 0.64rem;
-    letter-spacing: 0.1em;
+    font-family: var(--font-label);
+    font-size: var(--step--1);
+    letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: rgba(193, 207, 230, 0.78);
+    color: var(--text-3);
   }
 
   input,
   textarea {
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    background: rgba(3, 7, 16, 0.42);
-    color: rgba(246, 250, 255, 0.96);
-    border-radius: 10px;
+    border: 1px solid var(--stroke-soft);
+    background: rgba(3, 7, 16, 0.44);
+    color: var(--text-1);
+    border-radius: var(--radius-sm);
     padding: 0.65rem 0.75rem;
-    outline: none;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    outline: transparent;
+    font-size: var(--step-0);
+    transition: border-color var(--dur-fast) var(--ease-std), box-shadow var(--dur-fast) var(--ease-std), background var(--dur-fast) var(--ease-std);
   }
 
   input:focus,
   textarea:focus {
-    border-color: rgba(176, 208, 255, 0.9);
-    box-shadow: 0 0 0 2px rgba(176, 208, 255, 0.15);
+    border-color: var(--accent-cyan);
+    box-shadow: 0 0 0 3px rgba(143, 214, 255, 0.24);
+    background: rgba(8, 13, 25, 0.62);
   }
 
   button {
     justify-self: start;
-    border: 1px solid rgba(255, 255, 255, 0.24);
-    color: rgba(248, 250, 255, 0.96);
-    background: rgba(255, 255, 255, 0.06);
-    border-radius: 10px;
+    border: 1px solid rgba(255, 78, 163, 0.42);
+    color: #ffe8f4;
+    background: linear-gradient(135deg, rgba(255, 78, 163, 0.28), rgba(125, 90, 255, 0.18));
+    border-radius: var(--radius-sm);
     padding: 0.58rem 0.9rem;
-    letter-spacing: 0.02em;
-    font-size: 0.84rem;
-    transition: background 0.2s ease, border-color 0.2s ease;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-family: var(--font-label);
+    font-size: var(--step--1);
+    transition: background var(--dur-fast) var(--ease-std), border-color var(--dur-fast) var(--ease-std), transform var(--dur-fast) var(--ease-emph);
   }
 
   button:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.12);
-    border-color: rgba(255, 255, 255, 0.38);
+    background: linear-gradient(135deg, rgba(255, 78, 163, 0.45), rgba(106, 150, 255, 0.26));
+    border-color: rgba(255, 78, 163, 0.7);
+    transform: translateY(-1px);
   }
 
   button:disabled {
@@ -265,14 +277,14 @@
 
   .portal-ok {
     margin-top: 0.6rem;
-    color: #b7f7dd;
-    font-size: 0.82rem;
+    color: var(--accent-mint);
+    font-size: var(--step--1);
   }
 
   .portal-error {
     margin-top: 0.6rem;
-    color: #ffbfd0;
-    font-size: 0.82rem;
+    color: #ffc4d8;
+    font-size: var(--step--1);
   }
 
   .hp {

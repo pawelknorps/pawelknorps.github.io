@@ -1,10 +1,127 @@
 @import "tailwindcss";
 
-:root {
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+@font-face {
+  font-family: "Knorps Display";
+  src: url('/fonts/knorps-display-regular.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
 }
 
-body,
+@font-face {
+  font-family: "Knorps Display";
+  src: url('/fonts/knorps-display-bold.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Knorps Body";
+  src: url('/fonts/knorps-body-regular.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Knorps Body";
+  src: url('/fonts/knorps-body-medium.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Knorps Label";
+  src: url('/fonts/knorps-label-heavy.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+}
+
+:root {
+  --font-display: "Knorps Display", "Iowan Old Style", "Georgia", serif;
+  --font-body: "Knorps Body", "Avenir Next", "Segoe UI", sans-serif;
+  --font-label: "Knorps Label", "Knorps Body", "Avenir Next", sans-serif;
+  --font-mono: "SF Mono", "JetBrains Mono", "Menlo", monospace;
+
+  --step--1: clamp(0.73rem, 0.72rem + 0.08vw, 0.8rem);
+  --step-0: clamp(0.9rem, 0.86rem + 0.15vw, 1rem);
+  --step-1: clamp(1rem, 0.96rem + 0.25vw, 1.16rem);
+  --step-2: clamp(1.18rem, 1.08rem + 0.5vw, 1.52rem);
+  --step-3: clamp(1.44rem, 1.24rem + 1vw, 2.04rem);
+  --step-4: clamp(1.85rem, 1.5rem + 1.6vw, 2.9rem);
+  --step-5: clamp(2.45rem, 1.8rem + 3vw, 4.5rem);
+  --step-6: clamp(3rem, 2rem + 4.8vw, 6.3rem);
+
+  --bg-0: #04060d;
+  --bg-1: #0b1021;
+  --bg-2: #121931;
+  --surface-1: rgba(11, 16, 31, 0.7);
+  --surface-2: rgba(19, 26, 46, 0.6);
+  --stroke-soft: rgba(184, 206, 255, 0.22);
+  --stroke-strong: rgba(229, 238, 255, 0.34);
+
+  --text-1: #f4f7ff;
+  --text-2: #d8e2f7;
+  --text-3: #a9b6d2;
+  --accent-pink: #ff4ea3;
+  --accent-pink-soft: rgba(255, 78, 163, 0.35);
+  --accent-cyan: #8fd6ff;
+  --accent-mint: #a9ffd6;
+
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --radius-xl: 28px;
+
+  --shadow-soft: 0 12px 35px rgba(2, 5, 14, 0.35);
+  --shadow-lg: 0 24px 80px rgba(0, 0, 0, 0.5);
+  --glass-blur: 14px;
+
+  --dur-fast: 180ms;
+  --dur-med: 320ms;
+  --dur-slow: 560ms;
+  --ease-std: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-emph: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html {
+  scroll-behavior: smooth;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100%;
+  overflow-x: hidden;
+  font-family: var(--font-body);
+  font-size: var(--step-0);
+  line-height: 1.65;
+  color: var(--text-1);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  background:
+    radial-gradient(circle at 14% 12%, rgba(151, 200, 255, 0.23), transparent 36%),
+    radial-gradient(circle at 86% 8%, rgba(255, 79, 162, 0.2), transparent 34%),
+    radial-gradient(circle at 62% 88%, rgba(116, 140, 255, 0.16), transparent 42%),
+    linear-gradient(135deg, var(--bg-0), var(--bg-1) 55%, #090d1f);
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.22;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 130px 130px, 130px 130px;
+}
+
 button,
 input,
 select,
@@ -12,14 +129,75 @@ textarea {
   font-family: inherit;
 }
 
-/* Smooth Scroll */
-html { scroll-behavior: smooth; }
+a {
+  color: inherit;
+}
 
-/* Scroll Bar */
-:root::-webkit-scrollbar { width: 0.25rem; }
-:root::-webkit-scrollbar-track { background: transparent; }
-:root::-webkit-scrollbar-thumb { background: #696969; }
-:root::-webkit-scrollbar-thumb:hover { background: #FF0080; }
+a,
+button,
+input,
+textarea,
+select {
+  transition:
+    color var(--dur-fast) var(--ease-std),
+    background-color var(--dur-fast) var(--ease-std),
+    border-color var(--dur-fast) var(--ease-std),
+    box-shadow var(--dur-fast) var(--ease-std),
+    transform var(--dur-fast) var(--ease-emph);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(143, 214, 255, 0.25);
+}
+
+::selection {
+  background-color: var(--accent-pink);
+  color: #fff;
+}
+
+:root::-webkit-scrollbar {
+  width: 0.35rem;
+}
+
+:root::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+:root::-webkit-scrollbar-thumb {
+  background: rgba(154, 169, 198, 0.68);
+  border-radius: 999px;
+}
+
+:root::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-pink);
+}
+
+.typ-display {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.typ-body {
+  font-family: var(--font-body);
+}
+
+.typ-label {
+  font-family: var(--font-label);
+  font-size: var(--step--1);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+}
+
+.surface-glass {
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  border: 1px solid var(--stroke-soft);
+  background: linear-gradient(140deg, var(--surface-2), var(--surface-1));
+  box-shadow: var(--shadow-soft);
+}
 
 @media (prefers-reduced-motion: reduce) {
   html {
@@ -32,5 +210,6 @@ html { scroll-behavior: smooth; }
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

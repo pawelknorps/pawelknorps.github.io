@@ -159,7 +159,7 @@
         in:fly={{ x: 50, duration: 1000 }}
     >
         <button
-            class="bg-black/40 backdrop-blur-md text-white/80 border border-white/20 rounded-full px-4 py-2 text-xs font-bold tracking-widest hover:bg-white/10 hover:text-white transition-all uppercase"
+            class="control-pill"
             on:click={() => (isExpanded = !isExpanded)}
         >
             {isExpanded ? "Hide Audio" : "Audio Params"}
@@ -167,7 +167,7 @@
 
         <button
             type="button"
-            class="bg-black/40 backdrop-blur-md text-white/80 border border-white/20 rounded-full px-4 py-2 text-xs font-bold tracking-widest hover:bg-white/10 hover:text-white transition-all uppercase"
+            class="control-pill"
             disabled={webcamLoading}
             on:click|stopPropagation={() => dispatch("toggleWebcamProjection")}
         >
@@ -185,7 +185,7 @@
 
         {#if isExpanded}
             <button
-                class="bg-black/40 backdrop-blur-md text-white/80 border border-white/20 rounded-full px-4 py-2 text-xs font-bold tracking-widest hover:bg-white/10 hover:text-[#FF0080] transition-all uppercase"
+                class="control-pill control-pill-accent"
                 on:click|stopPropagation={handlePlayClick}
             >
                 Play
@@ -203,14 +203,14 @@
                 <div class="flex gap-2 mb-2">
                     <button
                         type="button"
-                        class="flex-1 bg-black/40 border border-white/20 rounded-md px-2 py-1 text-[10px] tracking-wider uppercase text-white/80 hover:bg-white/10"
+                        class="control-mini flex-1"
                         on:click|stopPropagation={toggleGenerative}
                     >
                         {generativeEnabled ? "Generative: On" : "Generative: Off"}
                     </button>
                     <button
                         type="button"
-                        class="flex-1 bg-black/40 border border-white/20 rounded-md px-2 py-1 text-[10px] tracking-wider uppercase text-white/80 hover:bg-white/10"
+                        class="control-mini flex-1"
                         on:click|stopPropagation={toggleKeyLock}
                     >
                         {keyLocked ? "Key Lock: On" : "Key Lock: Off"}
@@ -280,14 +280,67 @@
 {/if}
 
 <style>
+    .audio-controls {
+        font-family: var(--font-body);
+    }
+
+    .control-pill {
+        font-family: var(--font-label);
+        font-size: var(--step--1);
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        border: 1px solid var(--stroke-soft);
+        color: var(--text-2);
+        background: linear-gradient(140deg, rgba(10, 17, 33, 0.78), rgba(5, 9, 20, 0.66));
+        border-radius: 999px;
+        padding: 0.56rem 1rem;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 10px 24px rgba(2, 5, 14, 0.3);
+        transition:
+            background var(--dur-fast) var(--ease-std),
+            color var(--dur-fast) var(--ease-std),
+            border-color var(--dur-fast) var(--ease-std),
+            transform var(--dur-fast) var(--ease-emph);
+    }
+
+    .control-pill:hover:not(:disabled) {
+        transform: translateY(-1px);
+        background: linear-gradient(140deg, rgba(16, 24, 46, 0.88), rgba(9, 15, 29, 0.74));
+        border-color: var(--stroke-strong);
+        color: var(--text-1);
+    }
+
+    .control-pill-accent:hover:not(:disabled) {
+        color: #ffd8ea;
+        border-color: rgba(255, 78, 163, 0.62);
+        box-shadow: 0 12px 28px rgba(255, 78, 163, 0.24);
+    }
+
+    .control-mini {
+        font-family: var(--font-label);
+        font-size: 0.62rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        border: 1px solid var(--stroke-soft);
+        border-radius: 0.55rem;
+        padding: 0.3rem 0.45rem;
+        color: var(--text-2);
+        background: rgba(10, 17, 33, 0.52);
+    }
+
+    .control-mini:hover {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: var(--stroke-strong);
+    }
+
     input[type="range"] {
         height: 14px;
     }
 
     .webcam-error {
-        color: #ffd1e5;
-        font-size: 0.85rem;
-        letter-spacing: 0.02em;
+        color: #ffd4e8;
+        font-size: var(--step-0);
+        letter-spacing: 0.01em;
         text-shadow: 0 1px 3px rgba(0, 0, 0, 0.42);
         text-align: right;
         width: 100%;

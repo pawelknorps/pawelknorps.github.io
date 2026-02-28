@@ -75,7 +75,7 @@ const createAboutTextTexture = () => {
     ctx.fillStyle = 'rgba(5, 8, 16, 0.0)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    ctx.font = '600 28px "Space Grotesk", "Sora", sans-serif';
+    ctx.font = '500 28px "Knorps Body", "Avenir Next", sans-serif';
     ctx.fillStyle = 'rgba(245, 247, 250, 0.92)';
     ctx.textBaseline = 'top';
     ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
@@ -384,7 +384,7 @@ const disposeSpriteTexture = (sprite) => {
 const createCanvasTextSprite = (text, options = {}) => {
     if (typeof document === 'undefined') return null;
     const {
-        font = '500 58px "Space Grotesk", "Sora", sans-serif',
+        font = '500 56px "Knorps Body", "Avenir Next", sans-serif',
         fillStyle = 'rgba(244, 247, 255, 0.95)',
         shadowColor = 'rgba(0, 0, 0, 0.45)',
         shadowBlur = 12,
@@ -450,13 +450,13 @@ const rebuildCanvasSubtitles = () => {
         disposeSpriteTexture(canvasSubtitleSprites.music);
     }
     canvasSubtitleSprites.role = createCanvasTextSprite(canvasSubtitleState.roleText, {
-        font: '400 56px "Space Grotesk", "Sora", sans-serif',
+        font: '500 54px "Knorps Body", "Avenir Next", sans-serif',
         fillStyle: 'rgba(242, 245, 255, 0.92)',
         shadowColor: 'rgba(6, 8, 16, 0.65)',
         shadowBlur: 10
     });
     canvasSubtitleSprites.music = createCanvasTextSprite(canvasSubtitleState.musicText, {
-        font: '700 48px "Space Grotesk", "Sora", sans-serif',
+        font: '800 46px "Knorps Label", "Knorps Body", sans-serif',
         fillStyle: 'rgba(255, 0, 128, 0.95)',
         shadowColor: 'rgba(0, 0, 0, 0.4)',
         shadowBlur: 8

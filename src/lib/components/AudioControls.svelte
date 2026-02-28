@@ -41,10 +41,10 @@
     let stateInterval;
 
     const rnboSliders = [
-        { id: "window", label: "Window", value: () => windowMs, min: 1, max: 1000 },
+        { id: "window", label: "Window", value: () => windowMs, min: 25, max: 250 },
         { id: "chorus", label: "Chorus", value: () => chorus, min: 0, max: 100 },
-        { id: "delay", label: "Delay", value: () => delayMs, min: 0, max: 2000 },
-        { id: "feedback", label: "Feedback", value: () => feedback, min: 0, max: 95 },
+        { id: "delay", label: "Delay", value: () => delayMs, min: 0, max: 1000 },
+        { id: "feedback", label: "Feedback", value: () => feedback, min: 0, max: 100 },
         { id: "mix", label: "Mix", value: () => mix, min: 0, max: 100 },
         { id: "pitchvol", label: "Pitch Vol", value: () => pitchvol, min: 0, max: 100 },
         { id: "revvol", label: "Reverb Vol", value: () => revvol, min: 0, max: 100 },

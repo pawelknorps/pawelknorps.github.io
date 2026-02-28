@@ -16,14 +16,10 @@ class AudioSystem {
         this.rnboPkg = null;
         this.volume = 0.52;
         this.synthVelocityScale = 0.42;
+        this.rnboParameterSpecs = new Map();
 
         // Parameter state
-        this.params = {
-            window: 100,
-            chorus: 20,
-            delay: 200,
-            feedback: 30
-        };
+        this.params = {};
 
         // Throttling
         this.lastCallTimes = {
@@ -88,22 +84,9 @@ class AudioSystem {
             this.analyser.fftSize = 256;
             this.analyser.smoothingTimeConstant = 0.9; // Smoother response
 
-            // Skip RNBO only for touch-centric narrow mobile environments.
-            const hasTouch = typeof navigator !== 'undefined' && (navigator.maxTouchPoints || 0) > 0;
-            const isMobile = hasTouch && window.innerWidth < 768;
-
-            if (!isMobile) {
-                // Setup MIDI immediately (don't wait for RNBO to load)
-                this.setupMIDI();
-
-                // Load RNBO Device
-                await this.loadRNBOPatch();
-            } else {
-                console.log('Mobile device detected: Skipping MIDI and RNBO loading for performance');
-                // Connect master gain directly to analyser for basic audio routing if needed
-                this.masterGain.connect(this.analyser);
-                this.analyser.connect(this.audioContext.destination);
-            }
+            // Always attempt RNBO so audio parameters remain effective across devices.
+            this.setupMIDI();
+            await this.loadRNBOPatch();
 
             this.isInitialized = true;
             console.log('Audio system initialized successfully');
@@ -169,6 +152,7 @@ class AudioSystem {
             // Dynamically load the patcher
             const patcherModule = await import('$lib/rnbo/efxplussynth.json');
             const patcher = patcherModule.default;
+            this.hydrateParameterSpecsFromPatcher(patcher);
 
             // Dynamically load RNBO library
             if (!this.rnboPkg) {
@@ -187,7 +171,11 @@ class AudioSystem {
 
             // Apply persistent per-user sound profile (strong randomization)
             this.userSoundProfile = this.getOrCreateUserSoundProfile();
-            this.applyParameterMap(this.userSoundProfile);
+            this.params = {
+                ...this.userSoundProfile,
+                ...this.params
+            };
+            this.applyParameterMap(this.params);
 
             this.attachComputerKeyboard();
             this.initGenerativeConductor();
@@ -229,10 +217,10 @@ class AudioSystem {
         const mode = Math.floor(Math.random() * 4);
         const profile = {
             // Core
-            window: Math.round(this.skewedRandom(1, 1000, mode === 0 ? 0.6 : 1.5)),
+            window: Math.round(this.skewedRandom(25, 250, mode === 0 ? 0.6 : 1.5)),
             chorus: Math.round(this.skewedRandom(0, 100, mode === 1 ? 0.8 : 1.4)),
-            delay: Math.round(this.skewedRandom(40, 2000, mode === 2 ? 0.9 : 1.6)),
-            feedback: Math.round(this.skewedRandom(8, 95, mode === 3 ? 0.75 : 1.4)),
+            delay: Math.round(this.skewedRandom(0, 1000, mode === 2 ? 0.9 : 1.6)),
+            feedback: Math.round(this.skewedRandom(8, 100, mode === 3 ? 0.75 : 1.4)),
 
             // Extra RNBO-facing params
             // Keep mix generally above 50% while still varied.
@@ -252,8 +240,13 @@ class AudioSystem {
     }
 
     getOrCreateUserSoundProfile() {
-        if (this.userSoundProfile) return this.userSoundProfile;
-        this.userSoundProfile = this.generateUserSoundProfile();
+        if (!this.userSoundProfile) {
+            this.userSoundProfile = this.generateUserSoundProfile();
+        }
+        this.params = {
+            ...this.userSoundProfile,
+            ...this.params
+        };
         return this.userSoundProfile;
     }
 
@@ -266,6 +259,40 @@ class AudioSystem {
         Object.entries(paramMap).forEach(([name, value]) => {
             this.setParameter(name, value);
         });
+    }
+
+    hydrateParameterSpecsFromPatcher(patcher) {
+        this.rnboParameterSpecs.clear();
+        const patcherParams = patcher?.desc?.parameters;
+        if (!Array.isArray(patcherParams)) return;
+
+        for (const patcherParam of patcherParams) {
+            const id = String(patcherParam?.paramId || '').trim();
+            const name = String(patcherParam?.name || '').trim();
+            const min = Number(patcherParam?.minimum);
+            const max = Number(patcherParam?.maximum);
+            const spec = {
+                min: Number.isFinite(min) ? min : null,
+                max: Number.isFinite(max) ? max : null
+            };
+            if (id) this.rnboParameterSpecs.set(id, spec);
+            if (name && !this.rnboParameterSpecs.has(name)) {
+                this.rnboParameterSpecs.set(name, spec);
+            }
+        }
+    }
+
+    clampToParameterRange(param, value) {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return null;
+
+        const spec = this.rnboParameterSpecs.get(param);
+        if (!spec) return numeric;
+
+        let clamped = numeric;
+        if (Number.isFinite(spec.min)) clamped = Math.max(spec.min, clamped);
+        if (Number.isFinite(spec.max)) clamped = Math.min(spec.max, clamped);
+        return clamped;
     }
 
     nowMs() {
@@ -647,7 +674,14 @@ class AudioSystem {
      * @param {number} value - Value (mapped from UI)
      */
     setParameter(param, value) {
-        this.params[param] = value;
+        const name = String(param || '').trim();
+        if (!name) return;
+        const safeValue = this.clampToParameterRange(name, value);
+        if (!Number.isFinite(safeValue)) return;
+        this.params[name] = safeValue;
+        if (this.userSoundProfile && Object.prototype.hasOwnProperty.call(this.userSoundProfile, name)) {
+            this.userSoundProfile[name] = safeValue;
+        }
         if (!this.rnboDevice) return;
 
         // Debug: Log available parameters once
@@ -656,22 +690,14 @@ class AudioSystem {
             this._hasLoggedParams = true;
         }
 
-        // Find parameter by name or id
-        const rnboParam = this.rnboDevice.parameters.find(p => p.name === param || p.id === param);
+        // Find parameter by id first, then by name.
+        const rnboParam = this.rnboDevice.parameters.find((p) => p.id === name)
+            || this.rnboDevice.parameters.find((p) => p.name === name);
 
         if (rnboParam) {
-            // console.log(`Setting RNBO param ${param} to ${value}`);
-            rnboParam.value = value;
+            rnboParam.value = safeValue;
         } else {
-            console.warn(`RNBO parameter '${param}' not found. Trying partial match...`);
-            // Try partial match for things like "feedback" matching "feedback[1]"
-            const partialParam = this.rnboDevice.parameters.find(p => p.name.includes(param) || p.id.includes(param));
-            if (partialParam) {
-                console.log(`Found partial match for '${param}': ${partialParam.name} (${partialParam.id})`);
-                partialParam.value = value;
-            } else {
-                console.warn(`RNBO parameter '${param}' strictly not found`);
-            }
+            console.warn(`RNBO parameter '${name}' not found`);
         }
     }
 

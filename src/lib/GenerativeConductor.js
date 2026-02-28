@@ -397,10 +397,10 @@ class GenerativeConductor {
         const mood = this.macros.mood;
 
         const ranges = {
-            window: { min: 1, max: 1000, depth: 70 },
+            window: { min: 25, max: 250, depth: 18 },
             chorus: { min: 0, max: 100, depth: 14 },
-            delay: { min: 0, max: 2000, depth: 180 },
-            feedback: { min: 0, max: 95, depth: 12 },
+            delay: { min: 0, max: 1000, depth: 120 },
+            feedback: { min: 0, max: 100, depth: 12 },
             mix: { min: 0, max: 100, depth: 10 },
             revvol: { min: 0, max: 100, depth: 12 },
             octdamp: { min: 0, max: 100, depth: 10 },

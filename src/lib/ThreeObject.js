@@ -855,8 +855,9 @@ const createDestructiblePoint = (project, position) => {
 
 // Variables for morphing logic
 let currentTextureIndex = 0;
+let nextTextureIndex = texture.length > 1 ? 1 : 0;
 let morphing = false;
-const enableTextureMorph = false;
+const enableTextureMorph = texture.length > 1;
 let baseMorphSpeed = 0.000091;
 let morphSpeed = baseMorphSpeed;
 const morphDelay = 2000;
@@ -1265,9 +1266,9 @@ const animate = async () => {
         if (!morphing && now - lastMorphTime > morphDelay) {
             morphing = true;
             uniforms.tDiffuse1.value = texture[currentTextureIndex];
-            currentTextureIndex = (currentTextureIndex + 1) % texture.length;
-            uniforms.tDiffuse2.value = texture[currentTextureIndex];
-            uniforms.morphFactor.value = 0.5;
+            nextTextureIndex = (currentTextureIndex + 1) % texture.length;
+            uniforms.tDiffuse2.value = texture[nextTextureIndex];
+            uniforms.morphFactor.value = 0;
             lastMorphTime = now;
             // Play morph sound once per morph cycle
             if (now - lastMorphSoundTime > morphDelay) {
@@ -1279,7 +1280,10 @@ const animate = async () => {
         if (morphing) {
             uniforms.morphFactor.value += morphSpeed;
             if (uniforms.morphFactor.value >= 1.0) {
-                uniforms.morphFactor.value = 1.0;
+                currentTextureIndex = nextTextureIndex;
+                uniforms.tDiffuse1.value = texture[currentTextureIndex];
+                uniforms.tDiffuse2.value = texture[(currentTextureIndex + 1) % texture.length];
+                uniforms.morphFactor.value = 0;
                 morphing = false;
             }
         }

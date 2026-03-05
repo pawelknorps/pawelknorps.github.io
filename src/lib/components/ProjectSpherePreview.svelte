@@ -18,10 +18,11 @@
 	};
 
 	const shouldUseLiveMedia = () =>
-		previewSource === 'fallback' &&
 		(mediaKind === 'iframe' || mediaKind === 'video') &&
 		typeof mediaEmbedSrc === 'string' &&
 		mediaEmbedSrc.length > 0;
+
+	const isFacebookEmbed = () => (videoProvider || '').trim().toLowerCase() === 'facebook';
 
 	const overlayLabel = () => {
 		const normalized = (sourceLabel || videoProvider || 'project').trim().toLowerCase();
@@ -32,17 +33,21 @@
 
 <div class="sphere-preview" class:is-animated={!reducedMotion} role="group" aria-label={`${title || 'project'} preview`}>
 	{#if shouldUseLiveMedia() && mediaKind === 'iframe'}
-		<iframe
-			src={mediaEmbedSrc}
-			title={`${title || 'Project'} source`}
-			allow={mediaAllow || 'autoplay; encrypted-media; picture-in-picture; fullscreen'}
-			loading="lazy"
-			referrerpolicy="strict-origin-when-cross-origin"
-		></iframe>
+		<div class="sphere-preview__player" class:is-facebook={isFacebookEmbed()}>
+			<iframe
+				src={mediaEmbedSrc}
+				title={`${title || 'Project'} source`}
+				allow={mediaAllow || 'autoplay; encrypted-media; picture-in-picture; fullscreen'}
+				loading="lazy"
+				referrerpolicy="strict-origin-when-cross-origin"
+			></iframe>
+		</div>
 	{:else if shouldUseLiveMedia() && mediaKind === 'video'}
-		<video src={mediaEmbedSrc} controls playsinline preload="metadata">
-			<track kind="captions" srclang="en" label="Captions unavailable" />
-		</video>
+		<div class="sphere-preview__player">
+			<video src={mediaEmbedSrc} controls playsinline preload="metadata">
+				<track kind="captions" srclang="en" label="Captions unavailable" />
+			</video>
+		</div>
 	{:else if textureUrl}
 		<img src={textureUrl} alt={`${title || 'Project'} preview`} loading="lazy" decoding="async" />
 	{:else}
@@ -75,6 +80,7 @@
 
 	.sphere-preview img,
 	.sphere-preview__fallback,
+	.sphere-preview__player,
 	.sphere-preview iframe,
 	.sphere-preview video {
 		position: absolute;
@@ -88,13 +94,36 @@
 		object-fit: cover;
 	}
 
+	.sphere-preview__player {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: clamp(0.5rem, 1.6vw, 0.9rem);
+		z-index: 1;
+	}
+
+	.sphere-preview__player.is-facebook {
+		padding-inline: clamp(0.75rem, 4vw, 2rem);
+	}
+
 	.sphere-preview iframe {
+		position: relative;
+		display: block;
 		border: 0;
 		background: #070d18;
+		width: 100%;
+		height: 100%;
+		max-width: 100%;
 	}
 
 	.sphere-preview img {
 		opacity: 0.86;
+	}
+
+	.sphere-preview__player.is-facebook iframe {
+		width: min(100%, 26rem);
+		max-height: 100%;
+		margin: 0 auto;
 	}
 
 	.sphere-preview__fallback {

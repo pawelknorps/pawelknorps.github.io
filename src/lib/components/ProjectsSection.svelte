@@ -1,548 +1,271 @@
 <script>
-	import { createEventDispatcher } from 'svelte';
-	import { fade } from "svelte/transition";
+	import { createEventDispatcher, onMount } from 'svelte';
+	import { fade } from 'svelte/transition';
 	import { resolveProjectMedia } from '$lib/utils/projectMedia.js';
-	import SandboxedEmbed from '$lib/components/SandboxedEmbed.svelte';
-	
-	export let musicProjects;
-	export let programmingProjects;
-	export let adaptiveTextClass;
-	export let adaptiveSubTextClass;
-	let loadedVideos = {};
+	import ProjectSpherePreview from '$lib/components/ProjectSpherePreview.svelte';
+
+	export let musicProjects = [];
+	export let programmingProjects = [];
+	export let adaptiveTextClass = 'text-white';
+	export let adaptiveSubTextClass = 'text-gray-300';
 
 	const dispatch = createEventDispatcher();
+	let prefersReducedMotion = false;
 
-	const handleEnterViewport = (id) => {
-		if (!id || loadedVideos[id]) return;
-		loadedVideos = { ...loadedVideos, [id]: true };
+	const isValidUrl = (value) => typeof value === 'string' && value.trim() && value !== '#';
+
+	const formatSourceLabel = (value) => {
+		if (!value || typeof value !== 'string') return 'website';
+		return value.replace(/[_-]+/g, ' ').trim().toLowerCase();
 	};
 
-	function lazyLoad(node) {
-		if (typeof IntersectionObserver === 'undefined') {
-			node.dispatchEvent(new CustomEvent('enterViewport'));
-			return {};
+	const getDisplaySource = (project) => {
+		const previewSource = project?.previewSource || '';
+		const provider = project?.videoProvider || '';
+		if (previewSource === 'fallback') return formatSourceLabel(provider || 'website');
+		if (previewSource) return formatSourceLabel(previewSource);
+		return formatSourceLabel(provider || 'website');
+	};
+
+	const getProjectTags = (project) => {
+		if (Array.isArray(project?.features) && project.features.length > 0) return project.features;
+		if (Array.isArray(project?.technologies) && project.technologies.length > 0) return project.technologies;
+		return [];
+	};
+
+	const getExternalLinks = (project) => {
+		const links = [];
+
+		if (project?.links && typeof project.links === 'object') {
+			for (const [platform, url] of Object.entries(project.links)) {
+				if (!isValidUrl(url)) continue;
+				links.push({ label: platform, url: url.trim() });
+			}
 		}
 
-		const observer = new IntersectionObserver(
-			(entries) => {
-				entries.forEach((entry) => {
-					if (entry.isIntersecting) {
-						node.dispatchEvent(new CustomEvent('enterViewport'));
-						observer.unobserve(node);
-					}
-				});
-			},
-			{ rootMargin: '200px 0px', threshold: 0.01 }
-		);
+		if (isValidUrl(project?.github)) {
+			links.push({ label: 'github', url: project.github.trim() });
+		}
+		if (isValidUrl(project?.demo)) {
+			links.push({ label: 'demo', url: project.demo.trim() });
+		}
+		if (isValidUrl(project?.website)) {
+			links.push({ label: 'website', url: project.website.trim() });
+		}
 
-		observer.observe(node);
-
-		return {
-			destroy() {
-				observer.disconnect();
-			}
-		};
-	}
+		const seen = new Set();
+		return links.filter((entry) => {
+			if (seen.has(entry.url)) return false;
+			seen.add(entry.url);
+			return true;
+		});
+	};
 
 	const openInApp = (event, project, type) => {
+		event?.preventDefault?.();
+		event?.stopPropagation?.();
 		const media = resolveProjectMedia(project);
-		const url = media.url;
-		if (!url || media.provider !== 'youtube') return;
-		event.preventDefault();
-		dispatch('openProjectMedia', { ...project, type, mediaUrl: url });
+		dispatch('openProjectMedia', {
+			...project,
+			type,
+			mediaUrl: media.url,
+			videoProvider: media.provider
+		});
 	};
+
+	const handleCardClick = (event, project, type) => {
+		const target = event?.target;
+		if (target instanceof HTMLElement) {
+			if (target.closest('.project-card__media') || target.closest('.project-card__actions')) {
+				return;
+			}
+		}
+		openInApp(event, project, type);
+	};
+
+	const handleCardKeydown = (event, project, type) => {
+		if (event.key !== 'Enter' && event.key !== ' ') return;
+		event.preventDefault();
+		openInApp(event, project, type);
+	};
+
+	onMount(() => {
+		if (typeof window === 'undefined') return;
+		const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+		prefersReducedMotion = mediaQuery.matches;
+		const syncPreference = (entry) => {
+			prefersReducedMotion = entry.matches;
+		};
+		mediaQuery.addEventListener('change', syncPreference);
+		return () => mediaQuery.removeEventListener('change', syncPreference);
+	});
 </script>
 
-<!-- Music Projects -->
 {#if musicProjects.length > 0}
-	<div
-		class="project-group mb-32 w-full xl:flex xl:flex-col xl:items-start xl:max-w-[56rem] 2xl:max-w-[64rem]"
-	>
+	<div class="project-group mb-32 w-full xl:flex xl:flex-col xl:items-start xl:max-w-[56rem] 2xl:max-w-[64rem]">
 		{#each musicProjects as data, i}
-			{@const youtubeId = data.links?.youtube
-				? (() => {
-						const regExp =
-							/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-						const match = data.links.youtube.match(regExp);
-						return match && match[2].length === 11
-							? match[2]
-							: null;
-					})()
-				: null}
-
-			{@const facebookUrl =
-				!youtubeId &&
-				data.links?.facebook &&
-				(data.links.facebook.includes("/videos/") ||
-					data.links.facebook.includes("/watch") ||
-					data.links.facebook.includes("/reel/"))
-					? data.links.facebook
-					: null}
-
-			{@const soundcloudUrl =
-				!youtubeId &&
-				!facebookUrl &&
-				data.links?.soundcloud &&
-				data.links.soundcloud.includes("soundcloud.com")
-					? data.links.soundcloud
-					: null}
-
-			{@const instagramUrl =
-				!youtubeId &&
-				!facebookUrl &&
-				!soundcloudUrl &&
-				data.links?.instagram &&
-				(data.links.instagram.includes("instagram.com/p/") ||
-					data.links.instagram.includes("instagram.com/reel/"))
-					? data.links.instagram
-					: null}
-
+			{@const links = getExternalLinks(data)}
+			{@const tags = getProjectTags(data)}
+			{@const primaryLink = links[0]}
+			{@const displaySource = getDisplaySource(data)}
+			{@const media = resolveProjectMedia(data)}
 			<div
 				id="music-{i}"
-				class="group my-20 translate-y-0 hover:-translate-y-4 duration-[400ms] ease-in-out w-full md:max-w-[40rem] lg:max-w-[48rem] xl:max-w-[56rem] 2xl:max-w-[64rem] project-card pointer-events-auto"
-				in:fade={{ delay: 250 * i, duration: 1000 }}
+				class="project-card group my-20 w-full md:max-w-[40rem] lg:max-w-[48rem] xl:max-w-[56rem] 2xl:max-w-[64rem] pointer-events-auto"
+				role="button"
+				tabindex="0"
+				aria-label={`Open ${data.title} project`}
+				on:click={(event) => handleCardClick(event, data, 'music')}
+				on:keydown={(event) => handleCardKeydown(event, data, 'music')}
+				in:fade={{ delay: 250 * i, duration: 900 }}
 			>
-				{#if youtubeId}
-					<!-- YouTube Video -->
-					<div
-						class="block h-auto px-0 py-0 tracking-widest transition-all duration-300"
+				<div class="project-card__media">
+					<ProjectSpherePreview
+						textureUrl={data.previewImageUrl}
+						title={data.title}
+						videoProvider={data.videoProvider}
+						previewSource={data.previewSource}
+						sourceLabel={displaySource}
+						mediaKind={media.kind}
+						mediaEmbedSrc={media.embedSrc}
+						mediaAllow={media.allow}
+						reducedMotion={prefersReducedMotion}
+						on:open={() => openInApp(null, data, 'music')}
+					/>
+					<span class="project-card__source">{displaySource}</span>
+				</div>
+
+				<div class="project-card__body">
+					<p class="project-card__type">{data.type || 'Music Project'}</p>
+					<h2
+						class="adaptive-text"
+						class:text-white={adaptiveTextClass === 'text-white'}
+						class:text-gray-900={adaptiveTextClass === 'text-gray-900'}
 					>
-						<h2
-							class="text-xl font-black mb-4 adaptive-text"
-							class:text-white={adaptiveTextClass ===
-								"text-white"}
-							class:text-gray-900={adaptiveTextClass ===
-								"text-gray-900"}
-						>
-							<mark
-								style="background: none;"
-								class="text-[#FF0080]">.</mark
-							>&nbsp;{data.title}
-						</h2>
-
-						<!-- Video Container -->
-						<div
-							class="relative w-full aspect-video mb-6 rounded-lg overflow-hidden border border-white/10 shadow-lg"
-							use:lazyLoad
-							on:enterViewport={() =>
-								handleEnterViewport(`youtube-${i}`)}
-						>
-							{#if loadedVideos[`youtube-${i}`]}
-								<SandboxedEmbed
-									src="https://www.youtube.com/embed/{youtubeId}"
-									title={data.title}
-									allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-									className="absolute top-0 left-0 w-full h-full"
-								/>
-							{/if}
-						</div>
-
-						<h2
-							class="text-md font-base mb-6 leading-relaxed adaptive-subtext"
-							class:text-gray-300={adaptiveSubTextClass ===
-								"text-gray-300"}
-							class:text-gray-200={adaptiveSubTextClass ===
-								"text-gray-200"}
-							class:text-gray-700={adaptiveSubTextClass ===
-								"text-gray-700"}
-						>
-							{data.description}
-						</h2>
-
-						<div class="project-tags flex flex-wrap gap-3 mb-4">
-							{#if data.features}
-								{#each data.features as feature}
-									<span
-										class="text-[0.65rem] text-[#FF0080] tracking-widest uppercase font-semibold border border-[#FF0080]/30 px-3 py-1 rounded-full"
-										>{feature}</span
-									>
-								{/each}
-							{/if}
-						</div>
-						<!-- External Links -->
-						<div class="flex flex-wrap gap-4 mt-4">
-							{#if data.links}
-								{#each Object.entries(data.links) as [platform, url]}
-									{#if (platform !== "youtube" || !youtubeId) && url && url !== "#" && url !== ""}
-										<a
-											href={url}
-											target="_blank"
-											rel="noopener noreferrer"
-											class="text-xs uppercase tracking-widest hover:text-[#FF0080] transition-colors duration-300 adaptive-subtext border-b border-transparent hover:border-[#FF0080]"
-											class:text-gray-300={adaptiveSubTextClass ===
-												"text-gray-300"}
-											class:text-gray-200={adaptiveSubTextClass ===
-												"text-gray-200"}
-											class:text-gray-700={adaptiveSubTextClass ===
-												"text-gray-700"}
-										>
-											{platform} ↗
-										</a>
-									{/if}
-								{/each}
-							{/if}
-						</div>
-					</div>
-				{:else if facebookUrl}
-					{@const isReel =
-						facebookUrl && facebookUrl.includes("/reel/")}
-					{@const aspectRatio =
-						data.videoAspectRatio || (isReel ? "9:16" : "16:9")}
-
-					<!-- Facebook Video -->
-					<div
-						class="block h-auto px-0 py-0 tracking-widest transition-all duration-300"
-					>
-						<h2
-							class="text-xl font-black mb-4 adaptive-text"
-							class:text-white={adaptiveTextClass ===
-								"text-white"}
-							class:text-gray-900={adaptiveTextClass ===
-								"text-gray-900"}
-						>
-							<mark
-								style="background: none;"
-								class="text-[#FF0080]">.</mark
-							>&nbsp;{data.title}
-						</h2>
-
-						<!-- Universal Centered Video Container (Fixed 16:9) -->
-						<div class="w-full flex justify-center mb-6">
-							<div
-								class="relative w-full aspect-video rounded-lg overflow-hidden border border-white/10 shadow-lg bg-black"
-								use:lazyLoad
-								on:enterViewport={() =>
-									handleEnterViewport(`facebook-${i}`)}
-							>
-								{#if loadedVideos[`facebook-${i}`]}
-									<SandboxedEmbed
-										src="https://www.facebook.com/plugins/video.php?href={encodeURIComponent(
-											facebookUrl,
-										)}&show_text=false&t=0"
-										title={`${data.title} Facebook video`}
-										allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share; fullscreen"
-										style="border:none;overflow:hidden;"
-										className="absolute left-0 w-full {aspectRatio ===
-										'9:16'
-											? 'h-[320%] top-1/2 -translate-y-1/2'
-											: aspectRatio === '1:1'
-												? 'h-[178%] top-1/2 -translate-y-1/2'
-												: 'h-full top-0'}"
-									/>
-								{/if}
-							</div>
-						</div>
-
-						<h2
-							class="text-md font-base mb-6 leading-relaxed adaptive-subtext"
-							class:text-gray-300={adaptiveSubTextClass ===
-								"text-gray-300"}
-							class:text-gray-200={adaptiveSubTextClass ===
-								"text-gray-200"}
-							class:text-gray-700={adaptiveSubTextClass ===
-								"text-gray-700"}
-						>
-							{data.description}
-						</h2>
-
-						<div class="project-tags flex flex-wrap gap-3 mb-4">
-							{#if data.features}
-								{#each data.features as feature}
-									<span
-										class="text-[0.65rem] text-[#FF0080] tracking-widest uppercase font-semibold border border-[#FF0080]/30 px-3 py-1 rounded-full"
-										>{feature}</span
-									>
-								{/each}
-							{/if}
-						</div>
-						<div class="flex flex-wrap gap-4 mt-4">
-							{#if data.links}
-								{#each Object.entries(data.links) as [platform, url]}
-									{#if (platform !== "facebook" || !facebookUrl) && url && url !== "#" && url !== ""}
-										<a
-											href={url}
-											target="_blank"
-											rel="noopener noreferrer"
-											class="text-xs uppercase tracking-widest hover:text-[#FF0080] transition-colors duration-300 adaptive-subtext border-b border-transparent hover:border-[#FF0080]"
-											class:text-gray-300={adaptiveSubTextClass ===
-												"text-gray-300"}
-											class:text-gray-200={adaptiveSubTextClass ===
-												"text-gray-200"}
-											class:text-gray-700={adaptiveSubTextClass ===
-												"text-gray-700"}
-										>
-											{platform} ↗
-										</a>
-									{/if}
-								{/each}
-							{/if}
-						</div>
-					</div>
-				{:else if soundcloudUrl}
-					<!-- SoundCloud Player -->
-					<div
-						class="block h-auto px-0 py-0 tracking-widest transition-all duration-300"
-					>
-						<h2
-							class="text-xl font-black mb-4 adaptive-text"
-							class:text-white={adaptiveTextClass ===
-								"text-white"}
-							class:text-gray-900={adaptiveTextClass ===
-								"text-gray-900"}
-						>
-							<mark
-								style="background: none;"
-								class="text-[#FF0080]">.</mark
-							>&nbsp;{data.title}
-						</h2>
-
-						<div
-							class="relative w-full mb-6 rounded-lg overflow-hidden border border-white/10 shadow-lg"
-							use:lazyLoad
-							on:enterViewport={() =>
-								handleEnterViewport(`soundcloud-${i}`)}
-						>
-							{#if loadedVideos[`soundcloud-${i}`]}
-								<SandboxedEmbed
-									height="166"
-									title={`${data.title} SoundCloud player`}
-									allow="autoplay"
-									src="https://w.soundcloud.com/player/?url={encodeURIComponent(
-										soundcloudUrl,
-									)}&color=%23ff0080&auto_play=false&hide_related=false&show_comments=true&show_user=true&show_reposts=false&show_teaser=true"
-								/>
-							{/if}
-						</div>
-
-						<h2
-							class="text-md font-base mb-6 leading-relaxed adaptive-subtext"
-							class:text-gray-300={adaptiveSubTextClass ===
-								"text-gray-300"}
-							class:text-gray-200={adaptiveSubTextClass ===
-								"text-gray-200"}
-							class:text-gray-700={adaptiveSubTextClass ===
-								"text-gray-700"}
-						>
-							{data.description}
-						</h2>
-
-						<div class="project-tags flex flex-wrap gap-3 mb-4">
-							{#if data.features}
-								{#each data.features as feature}
-									<span
-										class="text-[0.65rem] text-[#FF0080] tracking-widest uppercase font-semibold border border-[#FF0080]/30 px-3 py-1 rounded-full"
-										>{feature}</span
-									>
-								{/each}
-							{/if}
-						</div>
-						<div class="flex flex-wrap gap-4 mt-4">
-							{#if data.links}
-								{#each Object.entries(data.links) as [platform, url]}
-									{#if (platform !== "soundcloud" || !soundcloudUrl) && url && url !== "#" && url !== ""}
-										<a
-											href={url}
-											target="_blank"
-											rel="noopener noreferrer"
-											class="text-xs uppercase tracking-widest hover:text-[#FF0080] transition-colors duration-300 adaptive-subtext border-b border-transparent hover:border-[#FF0080]"
-											class:text-gray-300={adaptiveSubTextClass ===
-												"text-gray-300"}
-											class:text-gray-200={adaptiveSubTextClass ===
-												"text-gray-200"}
-											class:text-gray-700={adaptiveSubTextClass ===
-												"text-gray-700"}
-										>
-											{platform} ↗
-										</a>
-									{/if}
-								{/each}
-							{/if}
-						</div>
-					</div>
-				{:else if data.links}
-					<div class="block h-auto px-0 py-0 tracking-widest transition-all duration-300 transform hover:scale-[1.02]">
-						<h2
-							class="text-xl font-black mb-4 hover:text-[#FF0080] transition-colors duration-300 adaptive-text"
-							class:text-white={adaptiveTextClass ===
-								"text-white"}
-							class:text-gray-900={adaptiveTextClass ===
-								"text-gray-900"}
-						>
-							<mark
-								style="background: none;"
-								class="text-[#FF0080]">.</mark
-							>&nbsp;{data.title}
-						</h2>
-						<h2
-							class="text-md font-base mb-6 leading-relaxed adaptive-subtext"
-							class:text-gray-300={adaptiveSubTextClass ===
-								"text-gray-300"}
-							class:text-gray-200={adaptiveSubTextClass ===
-								"text-gray-200"}
-							class:text-gray-700={adaptiveSubTextClass ===
-								"text-gray-700"}
-						>
-							{data.description}
-						</h2>
-						<div class="project-tags flex flex-wrap gap-3">
-							{#if data.features}
-								{#each data.features as feature}
-									<span
-										class="text-[0.65rem] text-[#FF0080] tracking-widest uppercase font-semibold border border-[#FF0080]/30 px-3 py-1 rounded-full transform hover:skew-x-3 transition-transform duration-200"
-										>{feature}</span
-									>
-								{/each}
-							{/if}
-						</div>
-						<div class="mt-4">
-							<div class="flex flex-wrap gap-4">
-								<a
-									href={data.links.youtube ||
-										data.links.bandcamp ||
-										data.links.soundcloud ||
-										data.links.facebook ||
-										data.links.instagram ||
-										data.links.website ||
-										data.links.maps}
-									rel="noopener noreferrer"
-									target="_blank"
-									on:click={(event) => openInApp(event, data, 'music')}
-									class="inline-flex text-xs uppercase tracking-widest hover:text-[#FF0080] transition-colors duration-300 adaptive-subtext border-b border-transparent hover:border-[#FF0080]"
-								>
-									Open project ↗
-								</a>
-							</div>
-						</div>
-					</div>
-				{:else}
-					<div class="h-auto px-0 py-0 tracking-widest">
-						<h2
-							class="text-xl font-black mb-4 adaptive-text"
-							class:text-white={adaptiveTextClass ===
-								"text-white"}
-							class:text-gray-900={adaptiveTextClass ===
-								"text-gray-900"}
-						>
-							<mark
-								style="background: none;"
-								class="text-[#FF0080]">.</mark
-							>&nbsp;{data.title}
-						</h2>
-						<h2
-							class="text-md font-base mb-6 leading-relaxed adaptive-subtext"
-							class:text-gray-300={adaptiveSubTextClass ===
-								"text-gray-300"}
-							class:text-gray-200={adaptiveSubTextClass ===
-								"text-gray-200"}
-							class:text-gray-700={adaptiveSubTextClass ===
-								"text-gray-700"}
-						>
-							{data.description}
-						</h2>
-						<div class="project-tags flex flex-wrap gap-3">
-							{#if data.features}
-								{#each data.features as feature}
-									<span
-										class="text-[0.65rem] text-[#FF0080] tracking-widest uppercase font-semibold border border-[#FF0080]/30 px-3 py-1 rounded-full"
-										>{feature}</span
-									>
-								{/each}
-							{/if}
-						</div>
-					</div>
-				{/if}
-			</div>
-		{/each}
-	</div>
-{/if}
-
-<!-- Programming Projects -->
-{#if programmingProjects.length > 0}
-	<div
-		class="project-group mb-32 w-full xl:flex xl:flex-col xl:items-start xl:max-w-[56rem] 2xl:max-w-[64rem]"
-	>
-		<h3
-			class="text-3xl font-black tracking-widest mb-16 opacity-80 adaptive-text w-full xl:max-w-[56rem] 2xl:max-w-[64rem]"
-			class:text-white={adaptiveTextClass === "text-white"}
-			class:text-gray-900={adaptiveTextClass === "text-gray-900"}
-		>
-			<mark style="background: none;" class="text-[#FF0080]">//</mark> OTHER
-		</h3>
-		{#each programmingProjects as data, i}
-			<div
-				id="programming-{i}"
-				class="group my-20 translate-y-0 hover:-translate-y-4 duration-[400ms] ease-in-out w-full md:max-w-[40rem] lg:max-w-[48rem] xl:max-w-[56rem] 2xl:max-w-[64rem] project-card pointer-events-auto"
-				in:fade={{
-					delay: 250 * (i + musicProjects.length),
-					duration: 1000,
-				}}
-			>
-				{#if data.github || data.demo}
-					<div class="block h-auto px-0 py-0 tracking-widest transition-all duration-300 transform hover:scale-[1.02]">
-						<h2 class="text-xl font-black mb-4 hover:text-[#FF0080] transition-colors duration-300 adaptive-text"
-							class:text-white={adaptiveTextClass === 'text-white'}
-							class:text-gray-900={adaptiveTextClass === 'text-gray-900'}>
-							<mark style="background: none;" class="text-[#FF0080]">.</mark>&nbsp;{data.title}
-						</h2>
-						<h2
-							class="text-md font-base mb-4 leading-relaxed adaptive-subtext"
+						{data.title}
+					</h2>
+					{#if data.description}
+						<p
+							class="adaptive-subtext"
 							class:text-gray-300={adaptiveSubTextClass === 'text-gray-300'}
 							class:text-gray-200={adaptiveSubTextClass === 'text-gray-200'}
 							class:text-gray-700={adaptiveSubTextClass === 'text-gray-700'}
 						>
 							{data.description}
-						</h2>
-						<div class="project-tags flex flex-wrap gap-3">
-							{#if data.technologies}
-								{#each data.technologies as topic}
-									<span
-										class="text-[0.65rem] text-[#FF0080] tracking-widest uppercase font-semibold border border-[#FF0080]/30 px-3 py-1 rounded-full transform hover:skew-x-3 transition-transform duration-200"
-										>{topic}</span
-									>
-								{/each}
-							{/if}
+						</p>
+					{/if}
+
+					{#if tags.length > 0}
+						<div class="project-tags">
+							{#each tags as tag}
+								<span>{tag}</span>
+							{/each}
 						</div>
-						<div class="mt-4 flex flex-wrap gap-4">
-							<a href={data.github || data.demo} rel="noopener noreferrer" target="_blank" on:click={(event) => openInApp(event, data, 'programming')} class="inline-flex text-xs uppercase tracking-widest hover:text-[#FF0080] transition-colors duration-300 adaptive-subtext border-b border-transparent hover:border-[#FF0080]">Open project ↗</a>
-						</div>
+					{/if}
+
+					<div class="project-card__actions">
+						<button type="button" class="project-open" on:click={(event) => openInApp(event, data, 'music')}>
+							Open project
+						</button>
+						{#if primaryLink}
+							<a href={primaryLink.url} target="_blank" rel="noopener noreferrer" on:click|stopPropagation>{primaryLink.label} ↗</a>
+						{/if}
+						{#each links.slice(1, 5) as link}
+							<a href={link.url} target="_blank" rel="noopener noreferrer" on:click|stopPropagation>{link.label} ↗</a>
+						{/each}
 					</div>
-				{:else}
-					<div class="h-auto px-0 py-0 tracking-widest">
-						<h2
-							class="text-xl font-black mb-4 adaptive-text"
-							class:text-white={adaptiveTextClass ===
-								"text-white"}
-							class:text-gray-900={adaptiveTextClass ===
-								"text-gray-900"}
-						>
-							<mark
-								style="background: none;"
-								class="text-[#FF0080]">.</mark
-							>&nbsp;{data.title}
-						</h2>
-						<h2
-							class="text-md font-base mb-6 leading-relaxed adaptive-subtext"
-							class:text-gray-300={adaptiveSubTextClass ===
-								"text-gray-300"}
-							class:text-gray-200={adaptiveSubTextClass ===
-								"text-gray-200"}
-							class:text-gray-700={adaptiveSubTextClass ===
-								"text-gray-700"}
+				</div>
+			</div>
+		{/each}
+	</div>
+{/if}
+
+{#if programmingProjects.length > 0}
+	<div class="project-group mb-32 w-full xl:flex xl:flex-col xl:items-start xl:max-w-[56rem] 2xl:max-w-[64rem]">
+		<h3
+			class="text-3xl font-black tracking-widest mb-16 opacity-90 adaptive-text w-full xl:max-w-[56rem] 2xl:max-w-[64rem]"
+			class:text-white={adaptiveTextClass === 'text-white'}
+			class:text-gray-900={adaptiveTextClass === 'text-gray-900'}
+		>
+			OTHER
+		</h3>
+
+		{#each programmingProjects as data, i}
+			{@const links = getExternalLinks(data)}
+			{@const tags = getProjectTags(data)}
+			{@const primaryLink = links[0]}
+			{@const displaySource = getDisplaySource(data)}
+			{@const media = resolveProjectMedia(data)}
+			<div
+				id="programming-{i}"
+				class="project-card group my-20 w-full md:max-w-[40rem] lg:max-w-[48rem] xl:max-w-[56rem] 2xl:max-w-[64rem] pointer-events-auto"
+				role="button"
+				tabindex="0"
+				aria-label={`Open ${data.title} project`}
+				on:click={(event) => handleCardClick(event, data, 'programming')}
+				on:keydown={(event) => handleCardKeydown(event, data, 'programming')}
+				in:fade={{ delay: 250 * (i + musicProjects.length), duration: 900 }}
+			>
+				<div class="project-card__media">
+					<ProjectSpherePreview
+						textureUrl={data.previewImageUrl}
+						title={data.title}
+						videoProvider={data.videoProvider}
+						previewSource={data.previewSource}
+						sourceLabel={displaySource}
+						mediaKind={media.kind}
+						mediaEmbedSrc={media.embedSrc}
+						mediaAllow={media.allow}
+						reducedMotion={prefersReducedMotion}
+						on:open={() => openInApp(null, data, 'programming')}
+					/>
+					<span class="project-card__source">{displaySource}</span>
+				</div>
+
+				<div class="project-card__body">
+					<p class="project-card__type">{data.type || 'Programming Project'}</p>
+					<h2
+						class="adaptive-text"
+						class:text-white={adaptiveTextClass === 'text-white'}
+						class:text-gray-900={adaptiveTextClass === 'text-gray-900'}
+					>
+						{data.title}
+					</h2>
+					{#if data.description}
+						<p
+							class="adaptive-subtext"
+							class:text-gray-300={adaptiveSubTextClass === 'text-gray-300'}
+							class:text-gray-200={adaptiveSubTextClass === 'text-gray-200'}
+							class:text-gray-700={adaptiveSubTextClass === 'text-gray-700'}
 						>
 							{data.description}
-						</h2>
-						<div class="project-tags flex flex-wrap gap-3">
-							{#if data.technologies}
-								{#each data.technologies as topic}
-									<span
-										class="text-[0.65rem] text-[#FF0080] tracking-widest uppercase font-semibold border border-[#FF0080]/30 px-3 py-1 rounded-full"
-										>{topic}</span
-									>
-								{/each}
-							{/if}
+						</p>
+					{/if}
+
+					{#if tags.length > 0}
+						<div class="project-tags">
+							{#each tags as tag}
+								<span>{tag}</span>
+							{/each}
 						</div>
+					{/if}
+
+					<div class="project-card__actions">
+						<button
+							type="button"
+							class="project-open"
+							on:click={(event) => openInApp(event, data, 'programming')}
+						>
+							Open project
+						</button>
+						{#if primaryLink}
+							<a href={primaryLink.url} target="_blank" rel="noopener noreferrer" on:click|stopPropagation>{primaryLink.label} ↗</a>
+						{/if}
+						{#each links.slice(1, 5) as link}
+							<a href={link.url} target="_blank" rel="noopener noreferrer" on:click|stopPropagation>{link.label} ↗</a>
+						{/each}
 					</div>
-				{/if}
+				</div>
 			</div>
 		{/each}
 	</div>
@@ -553,144 +276,261 @@
 		background: transparent;
 	}
 
-	.project-tags {
-		display: none;
+	.project-card {
+		--card-surface-a: rgba(11, 17, 30, 0.62);
+		--card-surface-b: rgba(8, 13, 24, 0.78);
+		--card-outline: rgba(202, 221, 255, 0.24);
+		--card-outline-strong: rgba(224, 236, 255, 0.38);
+		--card-liquid-cyan: rgba(123, 198, 255, 0.2);
+		--card-liquid-pink: rgba(255, 128, 196, 0.16);
+		--card-shadow: 0 20px 44px -28px rgba(0, 0, 0, 0.8);
+		--card-shadow-hover: 0 24px 54px -30px rgba(0, 0, 0, 0.88);
+		--card-lift: -3px;
 	}
 
 	.project-card {
-		will-change: transform;
+		position: relative;
+		overflow: hidden;
+		border-radius: 20px;
+		padding: clamp(1rem, 0.85vw + 0.88rem, 1.28rem);
+		border: 1px solid var(--card-outline);
+		background:
+			radial-gradient(circle at 0% 100%, var(--card-liquid-cyan), transparent 56%),
+			radial-gradient(circle at 96% 4%, var(--card-liquid-pink), transparent 52%),
+			linear-gradient(154deg, var(--card-surface-a), var(--card-surface-b));
+		backdrop-filter: blur(8px) saturate(128%);
+		-webkit-backdrop-filter: blur(8px) saturate(128%);
+		box-shadow:
+			var(--card-shadow),
+			0 1px 0 rgba(255, 255, 255, 0.11) inset,
+			0 0 0 1px rgba(255, 255, 255, 0.04) inset;
 		transition:
 			transform var(--dur-med) var(--ease-emph),
-			border-color var(--dur-fast) var(--ease-std),
-			box-shadow var(--dur-fast) var(--ease-std),
-			background var(--dur-fast) var(--ease-std);
-		border-radius: var(--radius-lg);
-		padding: clamp(1.15rem, 2.2vw, 1.8rem);
-		position: relative;
-		backdrop-filter: blur(var(--glass-blur));
-		-webkit-backdrop-filter: blur(var(--glass-blur));
-		background:
-			radial-gradient(circle at 0% 0%, rgba(255, 78, 163, 0.12), transparent 30%),
-			radial-gradient(circle at 100% 100%, rgba(143, 214, 255, 0.08), transparent 35%),
-			linear-gradient(140deg, rgba(12, 17, 32, 0.72), rgba(10, 14, 28, 0.84));
-		border: 1px solid var(--stroke-soft);
-		box-shadow:
-			0 14px 36px -12px rgba(0, 0, 0, 0.45),
-			0 0 0 1px rgba(255, 255, 255, 0.02) inset;
-		overflow: hidden;
+			border-color var(--dur-med) var(--ease-std),
+			box-shadow var(--dur-med) var(--ease-std),
+			background-position var(--dur-slow) var(--ease-std);
 	}
 
 	.project-card::before {
-		content: "";
+		content: '';
 		position: absolute;
+		inset: 0 auto auto 0;
 		top: 0;
-		left: 0;
-		right: 0;
-		bottom: 0;
+		width: 100%;
+		height: 1px;
 		background: linear-gradient(
-			135deg,
-			rgba(255, 78, 163, 0.2),
-			rgba(255, 255, 255, 0.06)
+			90deg,
+			rgba(255, 255, 255, 0.04),
+			rgba(200, 223, 255, 0.58) 38%,
+			rgba(255, 176, 219, 0.36) 72%,
+			rgba(255, 255, 255, 0.04)
 		);
-		border-radius: var(--radius-lg);
-		opacity: 0;
-		transition: opacity var(--dur-med) var(--ease-std);
-		z-index: -1;
 		pointer-events: none;
 	}
 
-	.project-card:hover {
-		border-color: var(--stroke-strong);
-		box-shadow:
-			0 24px 54px -14px rgba(0, 0, 0, 0.55),
-			0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+	.project-card::after {
+		content: '';
+		position: absolute;
+		inset: -22% -16% auto;
+		height: 42%;
+		background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.07), transparent 70%);
+		opacity: 0.55;
+		filter: blur(12px);
+		pointer-events: none;
 	}
 
-	.project-card:hover::before {
-		opacity: 1;
+	.project-card:hover,
+	.project-card:focus-visible {
+		transform: translateY(var(--card-lift));
+		border-color: var(--card-outline-strong);
+		box-shadow:
+			var(--card-shadow-hover),
+			0 1px 0 rgba(255, 255, 255, 0.14) inset,
+			0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+	}
+
+	.project-card:focus-visible {
+		outline: none;
+		box-shadow:
+			var(--card-shadow-hover),
+			0 0 0 1px rgba(255, 255, 255, 0.08) inset,
+			0 0 0 2px rgba(143, 214, 255, 0.4);
+	}
+
+	.project-card__media {
+		position: relative;
+		width: 100%;
+		aspect-ratio: 16 / 9;
+		border-radius: 14px;
+		overflow: hidden;
+		border: 1px solid rgba(195, 216, 255, 0.24);
+		background:
+			radial-gradient(circle at 16% 18%, rgba(143, 214, 255, 0.2), transparent 58%),
+			radial-gradient(circle at 86% 86%, rgba(255, 126, 194, 0.18), transparent 62%),
+			#060a14;
+		box-shadow:
+			0 12px 24px rgba(0, 0, 0, 0.42),
+			inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+	}
+
+	.project-card__media::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		background:
+			linear-gradient(180deg, rgba(6, 10, 20, 0) 46%, rgba(6, 10, 20, 0.24) 100%),
+			radial-gradient(circle at 50% -30%, rgba(255, 255, 255, 0.18), transparent 60%);
+		pointer-events: none;
+	}
+
+	.project-card__source {
+		position: absolute;
+		right: 0.6rem;
+		top: 0.6rem;
+		padding: 0.2rem 0.48rem;
+		border-radius: 999px;
+		border: 1px solid rgba(255, 255, 255, 0.18);
+		background: rgba(7, 11, 20, 0.62);
+		backdrop-filter: blur(8px) saturate(120%);
+		-webkit-backdrop-filter: blur(8px) saturate(120%);
+		font-family: var(--font-label);
+		font-size: 0.56rem;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: rgba(228, 237, 255, 0.86);
+	}
+
+	.project-card__body {
+		margin-top: 0.84rem;
+		display: grid;
+		gap: 0.56rem;
+	}
+
+	.project-card__type {
+		margin: 0;
+		font-family: var(--font-label);
+		font-size: 0.64rem;
+		letter-spacing: 0.095em;
+		text-transform: uppercase;
+		color: rgba(188, 213, 245, 0.8);
 	}
 
 	.project-card .adaptive-text {
+		margin: 0;
 		font-family: var(--font-display);
-		font-size: var(--step-1);
-		font-weight: 600;
-		line-height: 1.28;
-		letter-spacing: 0.008em;
+		font-size: clamp(1.1rem, 0.94rem + 0.52vw, 1.3rem);
+		font-weight: 700;
+		line-height: 1.25;
+		letter-spacing: 0.006em;
+		text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 	}
 
 	.project-card .adaptive-subtext {
+		margin: 0;
 		font-family: var(--font-body);
-		font-size: var(--step--1);
-		line-height: 1.68;
-		color: var(--text-2);
-		letter-spacing: 0.01em;
+		font-size: clamp(0.8rem, 0.74rem + 0.18vw, 0.9rem);
+		line-height: 1.58;
+		letter-spacing: 0.004em;
+		color: rgba(215, 226, 246, 0.9);
+	}
+
+	.project-tags {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.38rem;
+	}
+
+	.project-tags span {
+		font-family: var(--font-label);
+		font-size: 0.56rem;
+		text-transform: uppercase;
+		letter-spacing: 0.065em;
+		border-radius: 999px;
+		padding: 0.22rem 0.52rem;
+		background: rgba(173, 206, 255, 0.08);
+		border: 1px solid rgba(179, 208, 255, 0.22);
+		color: rgba(209, 225, 250, 0.9);
+	}
+
+	.project-card__actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.48rem 0.74rem;
+		padding-top: 0.26rem;
+	}
+
+	.project-card__actions a,
+	.project-open {
+		text-decoration: none;
+		font-family: var(--font-label);
+		font-size: 0.61rem;
+		letter-spacing: 0.072em;
+		text-transform: uppercase;
+		padding: 0;
+		background: transparent;
+		border: none;
+		color: rgba(217, 229, 250, 0.92);
+		cursor: pointer;
+		border-bottom: 1px solid rgba(187, 210, 255, 0.22);
+	}
+
+	.project-card__actions a:hover,
+	.project-card__actions a:focus-visible,
+	.project-open:hover,
+	.project-open:focus-visible {
+		color: rgba(255, 188, 226, 0.98);
+		border-bottom-color: rgba(255, 188, 226, 0.86);
+		outline: none;
 	}
 
 	.project-group h3 {
 		font-family: var(--font-label);
-		letter-spacing: 0.08em;
-		font-size: var(--step-3);
+		letter-spacing: 0.1em;
 		text-transform: uppercase;
 	}
 
-	.project-group span {
-		font-family: var(--font-label);
-		font-size: var(--step--1);
-		letter-spacing: 0.06em;
-		border-radius: 999px;
-		border-color: rgba(255, 78, 163, 0.45);
-		color: #ff6db5;
-		background: rgba(255, 78, 163, 0.08);
-		transition:
-			background var(--dur-fast) var(--ease-std),
-			border-color var(--dur-fast) var(--ease-std),
-			color var(--dur-fast) var(--ease-std),
-			box-shadow var(--dur-fast) var(--ease-std);
-	}
-
-	.project-group span:hover {
-		background: rgba(255, 78, 163, 0.2);
-		border-color: rgba(255, 78, 163, 0.84);
-		color: white;
-		box-shadow: 0 0 18px rgba(255, 78, 163, 0.42);
-	}
-
-	.project-group a {
-		font-family: var(--font-label);
-		letter-spacing: 0.06em;
-		border-bottom: 1px solid rgba(255, 78, 163, 0.28);
-		color: #cedaf5;
-	}
-
-	.project-group a:hover {
-		color: var(--accent-pink);
-		border-bottom-color: var(--accent-pink);
-	}
-
-	.adaptive-text,
-	.adaptive-subtext {
-		transition: color var(--dur-med) var(--ease-std);
-	}
-
-	.adaptive-text {
-		text-shadow:
-			0 8px 24px rgba(0, 0, 0, 0.46),
-			0 2px 4px rgba(0, 0, 0, 0.32);
-	}
-
-	.adaptive-subtext {
-		text-shadow:
-			0 0 12px rgba(0, 0, 0, 0.42),
-			0 1px 2px rgba(0, 0, 0, 0.3);
-	}
-
 	@media (max-width: 900px) {
-		.project-card .adaptive-text {
-			font-size: var(--step-0);
+		.project-card {
+			padding: 0.9rem;
+			border-radius: 18px;
 		}
 
-		.project-card .adaptive-subtext {
-			font-size: 0.78rem;
+		.project-card .adaptive-text {
+			font-size: var(--step-1);
+		}
+
+		.project-card__source {
+			font-size: 0.62rem;
+			padding: 0.26rem 0.56rem;
+		}
+
+		.project-card__actions {
+			gap: 0.5rem;
+		}
+
+		.project-card__actions a,
+		.project-open {
+			display: inline-flex;
+			align-items: center;
+			min-height: 40px;
+			padding: 0.36rem 0.62rem;
+			font-size: 0.68rem;
+			letter-spacing: 0.065em;
+			border-radius: 999px;
+			border: 1px solid rgba(187, 210, 255, 0.24);
+			border-bottom: 1px solid rgba(187, 210, 255, 0.24);
+			background: rgba(7, 11, 20, 0.34);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.project-card {
+			transition: border-color var(--dur-fast) var(--ease-std), box-shadow var(--dur-fast) var(--ease-std);
+		}
+
+		.project-card:hover,
+		.project-card:focus-visible {
+			transform: none;
 		}
 	}
 </style>

@@ -404,7 +404,6 @@
 		if (!ThreeObject || sceneInitialized) return;
 		
 		try {
-			console.log('Initializing 3D scene...');
 			
 			// Ensure canvas is properly sized
 			ThreeObject.width = window.innerWidth;
@@ -419,12 +418,10 @@
 					sceneReady = true;
 					syncSceneFocus();
 				
-				console.log('Scene initialized successfully');
 			
 			// Update projects if data is available
 			if (musicProjects.length > 0 || programmingProjects.length > 0) {
 				getImmersiveApi().updateProjects(musicProjects, programmingProjects);
-				console.log('Projects updated');
 			}
 			
 			// Start brightness sampling
@@ -497,12 +494,6 @@
 			personalData = portfolioData.personal ?? {};
 			musicProjects = Array.isArray(portfolioData.musicProjects) ? portfolioData.musicProjects : [];
 			programmingProjects = Array.isArray(portfolioData.programmingProjects) ? portfolioData.programmingProjects : [];
-			
-			console.log('Portfolio data loaded:', {
-				personal: !!personalData,
-				musicProjects: musicProjects.length,
-				programmingProjects: programmingProjects.length
-			});
 		} else {
 			console.error('Brak danych portfolio');
 		}
@@ -554,7 +545,6 @@
 	// Add a manual initialization trigger for debugging
 	const handleCanvasClick = async () => {
 		if (!sceneInitialized) {
-			console.log('Manual scene initialization triggered');
 			await initializeScene();
 		}
 		void preloadAudioControls();
@@ -740,7 +730,7 @@
 
 	/* By default, let Three.js control all gestures */
 	canvas {
-	touch-action: none;
+		touch-action: none;
 	}
 
 	/* Simple audio notice */
@@ -763,8 +753,18 @@
 	/* Responsive adjustments for mobile */
 	@media (max-width: 800px) {
 		canvas {
-		touch-action: pan-y;
-	}
+			/* Let users scroll the page naturally; horizontal drags are handled in JS. */
+			touch-action: pan-y pinch-zoom;
+		}
+
+		.audio-notice {
+			top: auto;
+			bottom: 1rem;
+			padding: 0.48rem 0.9rem;
+			font-size: 0.7rem;
+			max-width: calc(100vw - 1.5rem);
+			text-align: center;
+		}
 	}
 
 	/* Large screen adjustments */

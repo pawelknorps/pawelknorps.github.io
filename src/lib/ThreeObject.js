@@ -113,6 +113,31 @@ const rotationFriction = 0.94;
 const maxDragTilt = Math.PI * 0.48;
 let dragStartTime = 0;
 let hasMovedWhileDragging = false;
+let lastInteractionPoint = { x: 0, y: 0 };
+let audioInitPromise = null;
+let touchStartPoint = null;
+let touchGestureIntent = null;
+let touchGestureArmed = false;
+
+const isCoarsePointer = () =>
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(pointer: coarse)').matches;
+
+const ensureAudioInitialized = async () => {
+    if (audioSystem.isInitialized) return true;
+    if (!audioInitPromise) {
+        audioInitPromise = audioSystem.init()
+            .catch((error) => {
+                console.warn('Audio bootstrap failed:', error);
+            })
+            .finally(() => {
+                audioInitPromise = null;
+            });
+    }
+    await audioInitPromise;
+    return audioSystem.isInitialized;
+};
 
 // Custom ShaderMaterial for morphing with Perlin noise in vertex shader
 const morphShader = {
@@ -529,7 +554,6 @@ const initAudio = async () => {
         delayWet.connect(masterGain);
         
         isAudioInitialized = true;
-        console.log('Audio initialized successfully');
         
         // Hide audio notice
         const audioNotice = document.querySelector('.audio-notice');
@@ -795,8 +819,9 @@ const createDestructiblePoint = (project, position) => {
     pointGroup.add(particleSystem);
     
     // Add interaction sphere for raycasting (larger than the visible particles for easier mouse targeting)
+    const interactionRadius = isCoarsePointer() ? 0.18 : 0.12;
     const interactionSphere = new THREE.Mesh(
-        new THREE.SphereGeometry(0.12, 8, 8),
+        new THREE.SphereGeometry(interactionRadius, 8, 8),
         new THREE.MeshBasicMaterial({ visible: false })
     );
     pointGroup.add(interactionSphere);
@@ -1365,7 +1390,9 @@ const animate = async () => {
 
 export const resize = async () => {
     if (Renderer) {
-        Renderer.setPixelRatio(window.devicePixelRatio);
+        const pixelRatio = window.devicePixelRatio || 1;
+        const maxPixelRatio = window.innerWidth < 900 || isCoarsePointer() ? 1.6 : 2;
+        Renderer.setPixelRatio(Math.min(pixelRatio, maxPixelRatio));
         Renderer.setSize(window.innerWidth, window.innerHeight);
         CAMERA.aspect = window.innerWidth / window.innerHeight;
         CAMERA.updateProjectionMatrix();
@@ -1377,12 +1404,9 @@ export const resize = async () => {
 const onMouseDown = (event) => {
     if (!event) return;
     
-    console.log('Mouse down detected at:', event.clientX, event.clientY);
     
     // Initialize audio on first user interaction
-    if (!audioSystem.isInitialized) {
-        audioSystem.init();
-    }
+    void ensureAudioInitialized();
     
     isDragging = true;
     hasMovedWhileDragging = false;
@@ -1390,6 +1414,10 @@ const onMouseDown = (event) => {
     rotationVelocity.x *= 0.25;
     rotationVelocity.y *= 0.25;
     previousMousePosition = {
+        x: event.clientX,
+        y: event.clientY
+    };
+    lastInteractionPoint = {
         x: event.clientX,
         y: event.clientY
     };
@@ -1406,6 +1434,10 @@ const onMouseMove = (event) => {
     // Update mouse position for raycasting
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    lastInteractionPoint = {
+        x: event.clientX,
+        y: event.clientY
+    };
 
     if (isDragging) {
         const deltaMove = {
@@ -1415,7 +1447,6 @@ const onMouseMove = (event) => {
         
         if (Math.abs(deltaMove.x) > 1 || Math.abs(deltaMove.y) > 1) {
             hasMovedWhileDragging = true;
-            console.log('Dragging with delta:', deltaMove.x, deltaMove.y);
             
             // Play drag sound occasionally
             if (Math.random() < 0.58) {
@@ -1472,7 +1503,6 @@ const onMouseMove = (event) => {
 };
 
 const onMouseUp = (event) => {
-    console.log('Mouse up detected, was dragging:', isDragging, 'moved while dragging:', hasMovedWhileDragging);
     
     const dragDuration = performance.now() - dragStartTime;
     const wasDragging = isDragging && (dragDuration > 100 || hasMovedWhileDragging);
@@ -1489,6 +1519,8 @@ const onMouseUp = (event) => {
 
 const handleProjectClick = (event) => {
     if (!event) return;
+    if (!Renderer || !Renderer.domElement) return;
+    if (!Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) return;
     
     // Re-calculate mouse position for accurate raycasting
     const rect = Renderer.domElement.getBoundingClientRect();
@@ -1504,7 +1536,6 @@ const handleProjectClick = (event) => {
         const project = clickedGroup.userData;
         // Play click sound
         audioSystem.playClickSound();
-        console.log('Project clicked:', project.id);
 
         if (projectOpenHandler) {
             const wasHandled = projectOpenHandler(project);
@@ -1525,7 +1556,6 @@ const handleProjectClick = (event) => {
         // Scroll to the project section
         const projectElement = document.getElementById(project.id);
         if (projectElement) {
-            console.log('Scrolling to project:', project.id);
             projectElement.scrollIntoView({ 
                 behavior: 'smooth', 
                 block: 'center' 
@@ -1545,32 +1575,92 @@ const handleProjectClick = (event) => {
 
 // Touch event handlers
 const onTouchStart = (event) => {
-    if (!event || !event.touches) return;
+    if (!event || !event.touches || event.touches.length !== 1) return;
     const touch = event.touches[0];
-    onMouseDown({
-        clientX: touch.clientX,
-        clientY: touch.clientY,
-        preventDefault: () => event.preventDefault(),
-        stopPropagation: () => event.stopPropagation()
-    });
+    touchStartPoint = { x: touch.clientX, y: touch.clientY };
+    lastInteractionPoint = { x: touch.clientX, y: touch.clientY };
+    touchGestureIntent = null;
+    touchGestureArmed = true;
+    void ensureAudioInitialized();
 };
 
 const onTouchMove = (event) => {
-    if (!event || !event.touches) return;
+    if (!event || !event.touches || event.touches.length !== 1) return;
     const touch = event.touches[0];
-    onMouseMove({
-        clientX: touch.clientX,
-        clientY: touch.clientY,
-        preventDefault: () => event.preventDefault(),
-        stopPropagation: () => event.stopPropagation()
-    });
+    const currentPoint = { x: touch.clientX, y: touch.clientY };
+    lastInteractionPoint = currentPoint;
+
+    if (!touchGestureArmed || !touchStartPoint) return;
+
+    const deltaX = currentPoint.x - touchStartPoint.x;
+    const deltaY = currentPoint.y - touchStartPoint.y;
+    const absX = Math.abs(deltaX);
+    const absY = Math.abs(deltaY);
+    const movement = Math.hypot(deltaX, deltaY);
+
+    if (!touchGestureIntent) {
+        if (movement < 8) return;
+        touchGestureIntent = absY > absX * 1.15 ? 'scroll' : 'interact';
+        if (touchGestureIntent === 'interact') {
+            onMouseDown({
+                clientX: touchStartPoint.x,
+                clientY: touchStartPoint.y,
+                preventDefault: () => event.preventDefault(),
+                stopPropagation: () => event.stopPropagation()
+            });
+        } else {
+            touchGestureArmed = false;
+            return;
+        }
+    }
+
+    if (touchGestureIntent === 'interact') {
+        onMouseMove({
+            clientX: currentPoint.x,
+            clientY: currentPoint.y,
+            preventDefault: () => event.preventDefault(),
+            stopPropagation: () => event.stopPropagation()
+        });
+    }
 };
 
 const onTouchEnd = (event) => {
-    onMouseUp({
-        preventDefault: () => event && event.preventDefault ? event.preventDefault() : null,
-        stopPropagation: () => event && event.stopPropagation ? event.stopPropagation() : null
-    });
+    const changedTouch = event?.changedTouches?.[0];
+    const clientX = Number.isFinite(changedTouch?.clientX) ? changedTouch.clientX : lastInteractionPoint.x;
+    const clientY = Number.isFinite(changedTouch?.clientY) ? changedTouch.clientY : lastInteractionPoint.y;
+    const shouldInteract = touchGestureIntent === 'interact';
+    const isTap = touchGestureArmed && !touchGestureIntent;
+
+    if (isTap) {
+        onMouseDown({
+            clientX,
+            clientY,
+            preventDefault: () => event && event.preventDefault ? event.preventDefault() : null,
+            stopPropagation: () => event && event.stopPropagation ? event.stopPropagation() : null
+        });
+    }
+
+    if (shouldInteract || isTap) {
+        onMouseUp({
+            clientX,
+            clientY,
+            preventDefault: () => event && event.preventDefault ? event.preventDefault() : null,
+            stopPropagation: () => event && event.stopPropagation ? event.stopPropagation() : null
+        });
+    }
+
+    touchStartPoint = null;
+    touchGestureIntent = null;
+    touchGestureArmed = false;
+};
+
+const onTouchCancel = () => {
+    touchStartPoint = null;
+    touchGestureIntent = null;
+    touchGestureArmed = false;
+    isDragging = false;
+    hasMovedWhileDragging = false;
+    document.body.style.cursor = 'grab';
 };
 
 export const setScene = async (canvas) => {
@@ -1579,7 +1669,11 @@ export const setScene = async (canvas) => {
     }
 
     sceneCanvas = canvas;
-    Renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+    Renderer = new THREE.WebGLRenderer({
+        canvas: canvas,
+        antialias: !isCoarsePointer(),
+        powerPreference: isCoarsePointer() ? 'low-power' : 'high-performance'
+    });
     Renderer.setClearColor("#000000");
     if ('outputColorSpace' in Renderer && srgbColorSpace) {
         Renderer.outputColorSpace = srgbColorSpace;
@@ -1606,10 +1700,10 @@ export const setScene = async (canvas) => {
     canvas.addEventListener('touchstart', onTouchStart, { passive: false });
     canvas.addEventListener('touchmove', onTouchMove, { passive: false });
     canvas.addEventListener('touchend', onTouchEnd, { passive: false });
+    canvas.addEventListener('touchcancel', onTouchCancel, { passive: true });
     
     canvas.addEventListener('mouseenter', onCanvasMouseEnter);
     
-    console.log('Scene initialized with drag controls');
     registerNoteTriggerHandler();
     animationStarted = true;
     sceneStartTime = performance.now();
@@ -1728,7 +1822,6 @@ export const clearProjectedVideo = () => {
 };
 
 const onCanvasMouseEnter = () => {
-    console.log('Mouse entered canvas - events are working!');
 };
 
 export const destroyScene = () => {
@@ -1758,6 +1851,7 @@ export const destroyScene = () => {
         sceneCanvas.removeEventListener('touchstart', onTouchStart);
         sceneCanvas.removeEventListener('touchmove', onTouchMove);
         sceneCanvas.removeEventListener('touchend', onTouchEnd);
+        sceneCanvas.removeEventListener('touchcancel', onTouchCancel);
         sceneCanvas.removeEventListener('mouseenter', onCanvasMouseEnter);
         sceneCanvas = null;
     }

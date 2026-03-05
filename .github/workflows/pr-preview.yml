@@ -23,11 +23,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Validate data
-        run: npm run pipeline:validate
-
-      - name: Build
-        run: npm run build
+      - name: Run CI pipeline
+        run: npm run pipeline:ci
 
       - name: Deploy PR Preview
         uses: rossjrw/pr-preview-action@v1

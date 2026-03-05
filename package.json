@@ -11,7 +11,8 @@
 		"pipeline:schema-drift": "node scripts/checkSchemaDrift.mjs",
 		"pipeline:bundle-budget": "BUNDLE_BUDGET_JS_BYTES=760000 node scripts/checkBundleBudget.mjs",
 		"pipeline:visual-contract": "node scripts/checkVisualContract.mjs",
-		"pipeline:sitemap": "node scripts/generateSitemap.mjs"
+		"pipeline:sitemap": "node scripts/generateSitemap.mjs",
+		"pipeline:ci": "npm run pipeline:validate && npm run pipeline:schema-drift && npm run build && npm run pipeline:bundle-budget && npm run pipeline:visual-contract"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-static": "^3.0.10",

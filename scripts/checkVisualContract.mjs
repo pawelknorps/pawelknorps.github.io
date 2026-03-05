@@ -13,19 +13,19 @@ const checks = [
   },
   {
     file: 'src/lib/components/ProjectsSection.svelte',
-    required: ['project-card', 'videoAspectRatio', 'loadedVideos']
+    required: ['project-card', 'ProjectSpherePreview', 'previewImageUrl']
   },
   {
     file: 'src/lib/components/HeroSection.svelte',
-    required: ['hero-section', 'adaptive-text', 'revelation']
+    required: ['hero-section', 'adaptive-text', 'hero-title']
   },
   {
     file: 'src/lib/components/AudioControls.svelte',
-    required: ['audio-controls', 'slider-container', 'Audio Params']
+    required: ['audio-controls', 'Audio Params', 'rnboSliders']
   },
   {
     file: 'src/app.css',
-    required: ['@import "tailwindcss";', 'html { scroll-behavior: smooth; }']
+    required: ['@import "tailwindcss";', 'scroll-behavior: smooth;']
   }
 ];
 

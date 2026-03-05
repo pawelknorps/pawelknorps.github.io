@@ -73,7 +73,6 @@ class AudioSystem {
                 await this.audioContext.resume();
             }
 
-            console.log('Audio context initialized:', this.audioContext.state);
 
             // Master gain
             this.masterGain = this.audioContext.createGain();
@@ -89,7 +88,6 @@ class AudioSystem {
             await this.loadRNBOPatch();
 
             this.isInitialized = true;
-            console.log('Audio system initialized successfully');
 
             // Hide audio notice
             const audioNotice = document.querySelector('.audio-notice');
@@ -180,7 +178,6 @@ class AudioSystem {
             this.attachComputerKeyboard();
             this.initGenerativeConductor();
             this.startGenerativeLoop();
-            console.log('RNBO Device Loaded', this.rnboDevice.parameters);
 
         } catch (err) {
             console.error('Failed to load RNBO patch:', err);
@@ -446,19 +443,15 @@ class AudioSystem {
     }
 
     setupMIDI() {
-        console.log('Setting up MIDI...');
         if (navigator.requestMIDIAccess) {
             navigator.requestMIDIAccess().then(midiAccess => {
-                console.log('MIDI Access Granted');
                 // Log inputs
                 const inputs = Array.from(midiAccess.inputs.values());
-                console.log(`Found ${inputs.length} MIDI inputs:`, inputs.map(i => i.name));
 
                 for (let input of midiAccess.inputs.values()) {
                     input.onmidimessage = this.handleMIDIMessage.bind(this);
                 }
                 midiAccess.onstatechange = (e) => {
-                    console.log('MIDI State Change:', e.port.name, e.port.state);
                     if (e.port.type === 'input' && e.port.state === 'connected') {
                         e.port.onmidimessage = this.handleMIDIMessage.bind(this);
                     }
@@ -494,7 +487,6 @@ class AudioSystem {
         this.noteOn(60, 100, 0);
         window.setTimeout(() => this.noteOff(60, 0), duration);
 
-        console.log('Test note triggered');
     }
 
     registerNoteTriggerHandler(handler) {
@@ -684,9 +676,7 @@ class AudioSystem {
         }
         if (!this.rnboDevice) return;
 
-        // Debug: Log available parameters once
         if (!this._hasLoggedParams) {
-            console.log('Available RNBO parameters:', this.rnboDevice.parameters.map(p => ({ name: p.name, id: p.id })));
             this._hasLoggedParams = true;
         }
 

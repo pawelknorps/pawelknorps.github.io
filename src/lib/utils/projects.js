@@ -1,3 +1,5 @@
+import { getProjectPreview } from './projectPreview.js';
+
 const normalizeText = (value) =>
   String(value || '')
     .normalize('NFKD')
@@ -17,9 +19,11 @@ export const normalizeProject = (project, category, index = 0) => {
   const slugBase = slugify(title);
   const idSuffix = String(project?.id || index + 1).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 24);
   const slug = idSuffix ? `${slugBase}-${idSuffix}` : slugBase;
+  const preview = getProjectPreview(project);
 
   return {
     ...project,
+    ...preview,
     slug,
     category,
     categoryLabel: categoryLabel(category),

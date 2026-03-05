@@ -28,6 +28,12 @@ jobs:
       - name: Build with SvelteKit
         run: npm run build
 
+      - name: Check bundle budget
+        run: npm run pipeline:bundle-budget
+
+      - name: Check visual contract
+        run: npm run pipeline:visual-contract
+
       - name: Publish to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:

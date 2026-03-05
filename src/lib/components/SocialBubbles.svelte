@@ -130,14 +130,24 @@
 	/* Responsive adjustments for mobile */
 	@media (max-width: 768px) {
 		.social-bubbles {
-			top: 1rem;
-			right: 1rem;
-			gap: 0.75rem;
+			top: auto;
+			bottom: 0.9rem;
+			left: 50%;
+			right: auto;
+			transform: translateX(-50%);
+			gap: 0.55rem;
+			flex-direction: row;
+			padding: 0.36rem 0.55rem;
+			border-radius: 999px;
+			backdrop-filter: blur(8px);
+			-webkit-backdrop-filter: blur(8px);
+			background: rgba(7, 11, 20, 0.54);
+			border: 1px solid rgba(184, 206, 255, 0.18);
 		}
 		
 		.social-bubble {
-			width: 48px;
-			height: 48px;
+			width: 44px;
+			height: 44px;
 		}
 		
 		.social-bubble svg {

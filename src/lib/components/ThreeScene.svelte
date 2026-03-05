@@ -21,7 +21,6 @@
             .then((blob) => createImageBitmap(blob))
             .then((bitmap) => {
                 preloadedImage = bitmap;
-                console.log("Main image preloaded as ImageBitmap");
                 if (ThreeModule && sceneInitialized) {
                     ThreeModule.setInitialTexture(bitmap);
                 }
@@ -78,12 +77,10 @@
         if (!ThreeObject || sceneInitialized) return;
 
         try {
-            console.log("Initializing 3D scene...");
 
             ThreeModule = await import("$lib/ThreeObject.js");
 
             if (preloadedImage) {
-                console.log("Using preloaded image");
                 ThreeModule.setInitialTexture(preloadedImage);
             } else {
                 console.warn(
@@ -101,11 +98,9 @@
 
             ThreeModule.loadTextures();
 
-            console.log("Scene initialized successfully");
 
             if (musicProjects.length > 0 || programmingProjects.length > 0) {
                 ThreeModule.updateProjects(musicProjects, programmingProjects);
-                console.log("Projects updated");
             }
 
             // Start brightness sampling
@@ -145,7 +140,6 @@
 
     const handleCanvasClick = () => {
         if (!sceneInitialized) {
-            console.log("Manual scene initialization triggered");
             initializeScene();
         }
         dispatch("audioReq");

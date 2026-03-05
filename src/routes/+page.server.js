@@ -17,8 +17,17 @@ export const load = async () => {
     }
 
     const query = `{
-        "musicProjects": *[_type == "project" && category == "music" && !(_id in path("drafts.**")) && coalesce(status, "published") == "published" && (!defined(publishAt) || publishAt <= $now) && (!defined(unpublishAt) || unpublishAt > $now)] {..., "videoAspectRatio": coalesce(videoAspectRatio, "16:9")} | order(orderRank asc, coalesce(releaseDate, year) desc),
-        "programmingProjects": *[_type == "project" && category == "programming" && !(_id in path("drafts.**")) && coalesce(status, "published") == "published" && (!defined(publishAt) || publishAt <= $now) && (!defined(unpublishAt) || unpublishAt > $now)] | order(orderRank asc, coalesce(releaseDate, year) desc)
+        "musicProjects": *[_type == "project" && category == "music" && !(_id in path("drafts.**")) && coalesce(status, "published") == "published" && (!defined(publishAt) || publishAt <= $now) && (!defined(unpublishAt) || unpublishAt > $now)] {
+            ...,
+            "videoAspectRatio": coalesce(videoAspectRatio, "16:9"),
+            "coverUrl": cover.asset->url,
+            "coverAlt": coalesce(cover.alt, title)
+        } | order(orderRank asc, coalesce(releaseDate, year) desc),
+        "programmingProjects": *[_type == "project" && category == "programming" && !(_id in path("drafts.**")) && coalesce(status, "published") == "published" && (!defined(publishAt) || publishAt <= $now) && (!defined(unpublishAt) || unpublishAt > $now)] {
+            ...,
+            "coverUrl": cover.asset->url,
+            "coverAlt": coalesce(cover.alt, title)
+        } | order(orderRank asc, coalesce(releaseDate, year) desc)
     }`;
 
     try {

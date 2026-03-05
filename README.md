@@ -55,6 +55,10 @@ Workflow file: `.github/workflows/cloudflare-pages.yml`
 - `TURNSTILE_SECRET_KEY` (optional, enable Cloudflare Turnstile validation for contact form)
 - `TURNSTILE_ENFORCE` (optional, set to `true` to require a valid Turnstile token)
 - `PUBLIC_TURNSTILE_SITE_KEY` (optional, enables Turnstile widget on the contact form)
+- `CONTACT_ALLOWED_ORIGINS` (optional, comma-separated origins allowed to post to `/api/contact`; default: `https://knorps.com,https://www.knorps.com`)
+- `CONTACT_RATE_LIMIT_WINDOW_MS` (optional, contact API rate-limit window in milliseconds; default: `600000`)
+- `CONTACT_RATE_LIMIT_MAX` (optional, max contact submissions per IP within window; default: `5`)
+- `VITALS_LOG_ENABLED` (optional, set to `true` to log accepted web-vitals payloads; default: `false`)
 
 ### Commands
 

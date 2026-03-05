@@ -17,7 +17,11 @@ export async function onRequestPost(context) {
       return json({ ok: false, error: 'Invalid payload' }, 400);
     }
 
-    console.log('[web-vitals]', JSON.stringify(metric));
+    const loggingEnabled = context.env?.VITALS_LOG_ENABLED === 'true';
+    if (loggingEnabled) {
+      console.log('[web-vitals]', JSON.stringify(metric));
+    }
+
     return json({ ok: true }, 202);
   } catch (error) {
     return json({ ok: false, error: 'Unexpected error', details: String(error?.message || error) }, 500);

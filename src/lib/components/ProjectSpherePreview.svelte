@@ -1,38 +1,30 @@
 <script>
-	import { createEventDispatcher } from 'svelte';
-
 	export let textureUrl = '';
 	export let title = '';
 	export let videoProvider = '';
-	export let previewSource = '';
-	export let sourceLabel = '';
 	export let mediaKind = null;
 	export let mediaEmbedSrc = null;
 	export let mediaAllow = '';
 	export let reducedMotion = false;
-
-	const dispatch = createEventDispatcher();
-
-	const handleOpen = () => {
-		dispatch('open');
-	};
 
 	const shouldUseLiveMedia = () =>
 		(mediaKind === 'iframe' || mediaKind === 'video') &&
 		typeof mediaEmbedSrc === 'string' &&
 		mediaEmbedSrc.length > 0;
 
-	const isFacebookEmbed = () => (videoProvider || '').trim().toLowerCase() === 'facebook';
-
-	const overlayLabel = () => {
-		const normalized = (sourceLabel || videoProvider || 'project').trim().toLowerCase();
-		if (previewSource === 'fallback') return `${normalized} source`;
-		return `${normalized} preview`;
+	const isFacebookEmbed = () => {
+		const provider = (videoProvider || '').trim().toLowerCase();
+		if (provider === 'facebook') return true;
+		return typeof mediaEmbedSrc === 'string' && mediaEmbedSrc.includes('facebook.com/plugins/video.php');
 	};
+
+	const shouldRenderIframe = () => shouldUseLiveMedia() && mediaKind === 'iframe';
+	const shouldRenderVideo = () => shouldUseLiveMedia() && mediaKind === 'video';
+
 </script>
 
 <div class="sphere-preview" class:is-animated={!reducedMotion} role="group" aria-label={`${title || 'project'} preview`}>
-	{#if shouldUseLiveMedia() && mediaKind === 'iframe'}
+	{#if shouldRenderIframe()}
 		<div class="sphere-preview__player" class:is-facebook={isFacebookEmbed()}>
 			<iframe
 				src={mediaEmbedSrc}
@@ -42,7 +34,7 @@
 				referrerpolicy="strict-origin-when-cross-origin"
 			></iframe>
 		</div>
-	{:else if shouldUseLiveMedia() && mediaKind === 'video'}
+	{:else if shouldRenderVideo()}
 		<div class="sphere-preview__player">
 			<video src={mediaEmbedSrc} controls playsinline preload="metadata">
 				<track kind="captions" srclang="en" label="Captions unavailable" />
@@ -53,17 +45,6 @@
 	{:else}
 		<div class="sphere-preview__fallback" aria-hidden="true"></div>
 	{/if}
-	<div class="sphere-preview__overlay" aria-hidden="true">
-		<span>{overlayLabel()}</span>
-	</div>
-	<button
-		type="button"
-		class="sphere-preview__open"
-		on:click|stopPropagation={handleOpen}
-		aria-label={`Open ${title || 'project'}`}
-	>
-		Open
-	</button>
 </div>
 
 <style>
@@ -103,7 +84,8 @@
 	}
 
 	.sphere-preview__player.is-facebook {
-		padding-inline: clamp(0.75rem, 4vw, 2rem);
+		padding: 0;
+		overflow: hidden;
 	}
 
 	.sphere-preview iframe {
@@ -121,9 +103,15 @@
 	}
 
 	.sphere-preview__player.is-facebook iframe {
-		width: min(100%, 26rem);
-		max-height: 100%;
-		margin: 0 auto;
+		position: absolute;
+		inset: 50% auto auto 50%;
+		width: max(100%, calc(100% * 16 / 9));
+		height: max(100%, calc(100% * 16 / 9));
+		max-width: none;
+		max-height: none;
+		margin: 0;
+		transform: translate(-50%, -50%);
+		transform-origin: center center;
 	}
 
 	.sphere-preview__fallback {
@@ -140,58 +128,9 @@
 		pointer-events: none;
 	}
 
-	.sphere-preview__overlay {
-		position: absolute;
-		left: 0.5rem;
-		bottom: 0.45rem;
-		z-index: 2;
-	}
-
-	.sphere-preview__overlay span {
-		display: inline-flex;
-		align-items: center;
-		padding: 0.2rem 0.5rem;
-		border-radius: 999px;
-		border: 1px solid rgba(255, 255, 255, 0.16);
-		background: rgba(7, 12, 22, 0.54);
-		backdrop-filter: blur(6px);
-		-webkit-backdrop-filter: blur(6px);
-		font-family: var(--font-label);
-		font-size: 0.54rem;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		color: rgba(226, 236, 252, 0.86);
-	}
-
 	.sphere-preview:focus-visible {
 		outline: none;
 		box-shadow: inset 0 0 0 2px rgba(143, 214, 255, 0.52);
-	}
-
-	.sphere-preview__open {
-		position: absolute;
-		right: 0.5rem;
-		bottom: 0.45rem;
-		z-index: 2;
-		padding: 0.2rem 0.5rem;
-		border-radius: 999px;
-		border: 1px solid rgba(255, 255, 255, 0.2);
-		background: rgba(7, 12, 22, 0.58);
-		backdrop-filter: blur(6px);
-		-webkit-backdrop-filter: blur(6px);
-		font-family: var(--font-label);
-		font-size: 0.54rem;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		color: rgba(231, 240, 255, 0.92);
-		cursor: pointer;
-	}
-
-	.sphere-preview__open:hover,
-	.sphere-preview__open:focus-visible {
-		border-color: rgba(255, 190, 226, 0.7);
-		color: rgba(255, 205, 233, 0.98);
-		outline: none;
 	}
 
 	.sphere-preview.is-animated img {

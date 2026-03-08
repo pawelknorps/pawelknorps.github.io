@@ -668,10 +668,11 @@
 			>
 			<ProjectsSection 
 				{musicProjects}
-			{programmingProjects}
-			{adaptiveTextClass}
-			{adaptiveSubTextClass}
-			on:openProjectMedia={(event) => openProjectMedia(event.detail)}
+				{programmingProjects}
+				showOtherProjects={false}
+				{adaptiveTextClass}
+				{adaptiveSubTextClass}
+				on:openProjectMedia={(event) => openProjectMedia(event.detail)}
 			/>
 			</div>
 

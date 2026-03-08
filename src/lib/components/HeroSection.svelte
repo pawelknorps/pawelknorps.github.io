@@ -15,7 +15,7 @@
 	<div class="group z-10">
 		<button
 			type="button"
-			class="hero-title ml-6 md:ml-20 adaptive-text title-toggle typ-display"
+			class="hero-title ml-6 md:ml-20 adaptive-text text-contrast-strong title-toggle typ-display"
 			class:focus-active={bioFocusEnabled}
 			class:audio-live={isAudioEnabled}
 			style:--audio-intensity={audioIntensity}
@@ -25,12 +25,19 @@
 			class:text-gray-900={adaptiveTextClass === 'text-gray-900'}>
 			{personalData?.name || 'Paweł Knorps'}
 		</button>
+		<p
+			class="hero-role mt-8 ml-6 md:ml-20 adaptive-text text-contrast-soft typ-body"
+			class:text-white={adaptiveTextClass === 'text-white'}
+			class:text-gray-900={adaptiveTextClass === 'text-gray-900'}
+		>
+			Composer, Bassist, Producer and <span>guitarist.</span>
+		</p>
 		<h2
-			class="hero-subtitle mt-6 text-center md:text-left md:ml-20 adaptive-text typ-body"
+			class="hero-subtitle mt-12 text-center md:text-left md:ml-20 adaptive-text text-contrast-soft typ-body"
 			class:text-white={adaptiveTextClass === "text-white"}
 			class:text-gray-900={adaptiveTextClass === "text-gray-900"}
 		>
-			&nbsp;An experimental musician and improviser based in Poznań.
+			An experimental musician and improviser based in Poznań.
 		</h2>
 	</div>
 </div>
@@ -47,9 +54,6 @@
 	/* Adaptive text colors with smooth transitions */
 	.adaptive-text {
 		transition: color var(--dur-med) var(--ease-std);
-		text-shadow:
-			0 8px 24px rgba(0, 0, 0, 0.45),
-			0 2px 6px rgba(0, 0, 0, 0.34);
 	}
 
 	.title-toggle {
@@ -65,17 +69,43 @@
 	}
 
 	.hero-title {
-		font-size: clamp(3.05rem, 2.05rem + 4.6vw, 5.75rem);
-		line-height: 0.95;
-		letter-spacing: 0.01em;
+		font-size: clamp(3.4rem, 2.2rem + 5.4vw, 7.2rem);
+		line-height: 0.9;
+		letter-spacing: -0.055em;
+		text-transform: none;
+		font-weight: 700;
+		text-shadow:
+			0 10px 24px rgba(0, 0, 0, 0.34),
+			0 4px 8px rgba(0, 0, 0, 0.22);
+	}
+
+	.hero-role {
+		font-size: clamp(1.7rem, 1.08rem + 2.4vw, 3.25rem);
+		font-weight: 300;
+		line-height: 1.08;
+		letter-spacing: -0.04em;
+		max-width: 20ch;
+		color: rgba(255, 255, 255, 0.97);
+	}
+
+	.hero-role span {
+		color: #ff00b8;
+		font-weight: 700;
+		text-shadow:
+			0 0 18px rgba(255, 0, 184, 0.34),
+			0 6px 10px rgba(0, 0, 0, 0.28);
 	}
 
 	.hero-subtitle {
-		font-size: var(--step-0);
-		font-weight: 400;
-		letter-spacing: 0.04em;
-		max-width: 28ch;
-		color: var(--text-2);
+		font-size: clamp(1.45rem, 1rem + 1.65vw, 2.9rem);
+		font-weight: 300;
+		letter-spacing: -0.045em;
+		line-height: 1.14;
+		max-width: 32ch;
+		text-transform: none;
+		color: rgba(255, 255, 255, 0.94);
+		text-wrap: balance;
+		opacity: 1;
 	}
 
 	.title-toggle:hover {
@@ -117,12 +147,18 @@
 
 	@media (max-width: 900px) {
 		.hero-title {
-			font-size: clamp(2.45rem, 2rem + 2.8vw, 3.75rem);
+			font-size: clamp(2.9rem, 2rem + 4vw, 4.4rem);
+		}
+
+		.hero-role {
+			margin-top: 1.25rem;
+			font-size: clamp(1.55rem, 1.2rem + 1.8vw, 2.35rem);
+			max-width: 16ch;
 		}
 
 		.hero-subtitle {
-			font-size: var(--step--1);
-			letter-spacing: 0.03em;
+			font-size: clamp(1.2rem, 0.98rem + 1vw, 1.65rem);
+			letter-spacing: -0.035em;
 			padding: 0 1rem;
 			max-width: none;
 		}

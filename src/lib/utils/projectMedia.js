@@ -43,13 +43,33 @@ const isLikelyUrl = (value) => typeof value === 'string' && /^https?:\/\//i.test
 
 const normalizeHost = (value) => value.replace(/^www\./, '').toLowerCase();
 
+const isFacebookVideoUrl = (url) => {
+	try {
+		const parsed = new URL(url);
+		const host = normalizeHost(parsed.hostname);
+		if (!host.includes('facebook.com') && !host.includes('fb.watch')) return false;
+		const pathname = parsed.pathname.toLowerCase();
+		return (
+			host.includes('fb.watch') ||
+			pathname.includes('/videos/') ||
+			pathname.startsWith('/watch') ||
+			pathname.startsWith('/reel/') ||
+			pathname.startsWith('/share/v/')
+		);
+	} catch {
+		return false;
+	}
+};
+
 const inferProvider = (url) => {
 	try {
 		const host = normalizeHost(new URL(url).hostname);
 		if (host.includes('youtube.com') || host === 'youtu.be') return 'youtube';
 		if (host.includes('vimeo.com')) return 'vimeo';
 		if (host.includes('instagram.com')) return 'instagram';
-		if (host.includes('facebook.com') || host.includes('fb.watch')) return 'facebook';
+		if (host.includes('facebook.com') || host.includes('fb.watch')) {
+			return isFacebookVideoUrl(url) ? 'facebook' : 'website';
+		}
 		if (host.includes('soundcloud.com')) return 'soundcloud';
 		if (host.includes('tiktok.com')) return 'tiktok';
 		if (host.includes('bandcamp.com')) return 'bandcamp';
@@ -101,7 +121,7 @@ const resolveEmbed = (url, provider) => {
 			if (id) {
 				return {
 					kind: 'iframe',
-					embedSrc: `https://www.youtube.com/embed/${id}?autoplay=1&rel=0&modestbranding=1`,
+					embedSrc: `https://www.youtube.com/embed/${id}?autoplay=0&rel=0&modestbranding=1`,
 					allow: EMBED_ALLOW
 				};
 			}
@@ -112,7 +132,7 @@ const resolveEmbed = (url, provider) => {
 			if (id) {
 				return {
 					kind: 'iframe',
-					embedSrc: `https://player.vimeo.com/video/${id}?autoplay=1`,
+					embedSrc: `https://player.vimeo.com/video/${id}?autoplay=0`,
 					allow: EMBED_ALLOW
 				};
 			}
@@ -129,7 +149,7 @@ const resolveEmbed = (url, provider) => {
 			}
 		}
 
-		if (provider === 'facebook') {
+		if (provider === 'facebook' && isFacebookVideoUrl(url)) {
 			return {
 				kind: 'iframe',
 				embedSrc: `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}&show_text=false&width=1280`,
@@ -140,7 +160,7 @@ const resolveEmbed = (url, provider) => {
 		if (provider === 'soundcloud') {
 			return {
 				kind: 'iframe',
-				embedSrc: `https://w.soundcloud.com/player/?url=${encodeURIComponent(url)}&auto_play=true&hide_related=false&show_comments=false&show_user=true&show_reposts=false&visual=true`,
+				embedSrc: `https://w.soundcloud.com/player/?url=${encodeURIComponent(url)}&auto_play=false&hide_related=false&show_comments=false&show_user=true&show_reposts=false&visual=true`,
 				allow: 'autoplay'
 			};
 		}

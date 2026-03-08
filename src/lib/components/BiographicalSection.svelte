@@ -19,11 +19,11 @@
 <div class="biographical-text">
 	<div class="bio-flow-container" style="opacity: {bioOpacity}; min-height: 5rem;">
 		<div class="bio-title-overlay">
-			<h3 class="bio-title typ-label">O MNIE</h3>
+			<h3 class="bio-title text-contrast-soft typ-label">O MNIE</h3>
 		</div>
 
 		<div
-			class="bio-text typ-body text-base xl:text-mds leading-relaxed space-y-8 adaptive-subtext"
+			class="bio-text typ-body text-base xl:text-mds leading-relaxed space-y-8 adaptive-subtext text-contrast-soft"
 			class:text-gray-300={adaptiveSubTextClass === 'text-gray-300'}
 			class:text-gray-200={adaptiveSubTextClass === 'text-gray-200'}
 			class:text-gray-700={adaptiveSubTextClass === 'text-gray-700'}
@@ -92,7 +92,7 @@
 		margin: 0;
 		font-size: var(--step--1);
 		font-weight: 600;
-		color: var(--text-2);
+		color: #f8fbff;
 	}
 
 	.bio-text {
@@ -101,14 +101,14 @@
 
 	.bio-text p {
 		text-align: left;
-		font-weight: 400;
-		font-size: clamp(0.86rem, 0.83rem + 0.12vw, 0.96rem);
-		line-height: 1.72;
-		letter-spacing: 0.002em;
+		font-weight: 500;
+		font-size: clamp(0.9rem, 0.86rem + 0.18vw, 1.02rem);
+		line-height: 1.76;
+		letter-spacing: 0.01em;
 		margin: 0 auto 1rem;
 		max-width: 58ch;
 		padding-right: 0.25rem;
-		color: var(--text-2);
+		color: #f6f9ff;
 	}
 
 	.bio-text span {
@@ -145,9 +145,6 @@
 
 	.adaptive-subtext {
 		transition: color var(--dur-med) var(--ease-std);
-		text-shadow:
-			0 0 10px rgba(0, 0, 0, 0.45),
-			0 1px 4px rgba(0, 0, 0, 0.36);
 	}
 
 	@media (min-width: 1536px) {

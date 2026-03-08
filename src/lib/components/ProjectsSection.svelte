@@ -1,11 +1,13 @@
 <script>
 	import { createEventDispatcher, onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { fade } from 'svelte/transition';
 	import { resolveProjectMedia } from '$lib/utils/projectMedia.js';
 	import ProjectSpherePreview from '$lib/components/ProjectSpherePreview.svelte';
 
 	export let musicProjects = [];
 	export let programmingProjects = [];
+	export let showOtherProjects = true;
 	export let adaptiveTextClass = 'text-white';
 	export let adaptiveSubTextClass = 'text-gray-300';
 
@@ -13,25 +15,6 @@
 	let prefersReducedMotion = false;
 
 	const isValidUrl = (value) => typeof value === 'string' && value.trim() && value !== '#';
-
-	const formatSourceLabel = (value) => {
-		if (!value || typeof value !== 'string') return 'website';
-		return value.replace(/[_-]+/g, ' ').trim().toLowerCase();
-	};
-
-	const getDisplaySource = (project) => {
-		const previewSource = project?.previewSource || '';
-		const provider = project?.videoProvider || '';
-		if (previewSource === 'fallback') return formatSourceLabel(provider || 'website');
-		if (previewSource) return formatSourceLabel(previewSource);
-		return formatSourceLabel(provider || 'website');
-	};
-
-	const getProjectTags = (project) => {
-		if (Array.isArray(project?.features) && project.features.length > 0) return project.features;
-		if (Array.isArray(project?.technologies) && project.technologies.length > 0) return project.technologies;
-		return [];
-	};
 
 	const getExternalLinks = (project) => {
 		const links = [];
@@ -61,6 +44,8 @@
 		});
 	};
 
+	const getPrimaryProjectUrl = (project) => getExternalLinks(project)[0]?.url || project?.href || null;
+
 	const openInApp = (event, project, type) => {
 		event?.preventDefault?.();
 		event?.stopPropagation?.();
@@ -73,20 +58,34 @@
 		});
 	};
 
+	const navigateToProject = async (event, project, type) => {
+		event?.preventDefault?.();
+		const destination = getPrimaryProjectUrl(project);
+		if (!destination) {
+			openInApp(event, project, type);
+			return;
+		}
+		if (/^https?:\/\//i.test(destination)) {
+			window.open(destination, '_blank', 'noopener,noreferrer');
+			return;
+		}
+		await goto(destination);
+	};
+
 	const handleCardClick = (event, project, type) => {
 		const target = event?.target;
 		if (target instanceof HTMLElement) {
-			if (target.closest('.project-card__media') || target.closest('.project-card__actions')) {
+			if (target.closest('.project-card__actions')) {
 				return;
 			}
 		}
-		openInApp(event, project, type);
+		navigateToProject(event, project, type);
 	};
 
 	const handleCardKeydown = (event, project, type) => {
 		if (event.key !== 'Enter' && event.key !== ' ') return;
 		event.preventDefault();
-		openInApp(event, project, type);
+		navigateToProject(event, project, type);
 	};
 
 	onMount(() => {
@@ -105,9 +104,7 @@
 	<div class="project-group mb-32 w-full xl:flex xl:flex-col xl:items-start xl:max-w-[56rem] 2xl:max-w-[64rem]">
 		{#each musicProjects as data, i}
 			{@const links = getExternalLinks(data)}
-			{@const tags = getProjectTags(data)}
 			{@const primaryLink = links[0]}
-			{@const displaySource = getDisplaySource(data)}
 			{@const media = resolveProjectMedia(data)}
 			<div
 				id="music-{i}"
@@ -123,22 +120,18 @@
 					<ProjectSpherePreview
 						textureUrl={data.previewImageUrl}
 						title={data.title}
-						videoProvider={data.videoProvider}
-						previewSource={data.previewSource}
-						sourceLabel={displaySource}
+						videoProvider={media.provider || data.videoProvider}
 						mediaKind={media.kind}
 						mediaEmbedSrc={media.embedSrc}
 						mediaAllow={media.allow}
 						reducedMotion={prefersReducedMotion}
-						on:open={() => openInApp(null, data, 'music')}
 					/>
-					<span class="project-card__source">{displaySource}</span>
 				</div>
 
 				<div class="project-card__body">
 					<p class="project-card__type">{data.type || 'Music Project'}</p>
 					<h2
-						class="adaptive-text"
+						class="adaptive-text text-contrast-strong"
 						class:text-white={adaptiveTextClass === 'text-white'}
 						class:text-gray-900={adaptiveTextClass === 'text-gray-900'}
 					>
@@ -146,7 +139,7 @@
 					</h2>
 					{#if data.description}
 						<p
-							class="adaptive-subtext"
+							class="adaptive-subtext text-contrast-soft"
 							class:text-gray-300={adaptiveSubTextClass === 'text-gray-300'}
 							class:text-gray-200={adaptiveSubTextClass === 'text-gray-200'}
 							class:text-gray-700={adaptiveSubTextClass === 'text-gray-700'}
@@ -155,18 +148,7 @@
 						</p>
 					{/if}
 
-					{#if tags.length > 0}
-						<div class="project-tags">
-							{#each tags as tag}
-								<span>{tag}</span>
-							{/each}
-						</div>
-					{/if}
-
 					<div class="project-card__actions">
-						<button type="button" class="project-open" on:click={(event) => openInApp(event, data, 'music')}>
-							Open project
-						</button>
 						{#if primaryLink}
 							<a href={primaryLink.url} target="_blank" rel="noopener noreferrer" on:click|stopPropagation>{primaryLink.label} ↗</a>
 						{/if}
@@ -180,10 +162,10 @@
 	</div>
 {/if}
 
-{#if programmingProjects.length > 0}
+{#if showOtherProjects && programmingProjects.length > 0}
 	<div class="project-group mb-32 w-full xl:flex xl:flex-col xl:items-start xl:max-w-[56rem] 2xl:max-w-[64rem]">
 		<h3
-			class="text-3xl font-black tracking-widest mb-16 opacity-90 adaptive-text w-full xl:max-w-[56rem] 2xl:max-w-[64rem]"
+			class="text-3xl font-black tracking-widest mb-16 opacity-90 adaptive-text text-contrast-strong w-full xl:max-w-[56rem] 2xl:max-w-[64rem]"
 			class:text-white={adaptiveTextClass === 'text-white'}
 			class:text-gray-900={adaptiveTextClass === 'text-gray-900'}
 		>
@@ -192,9 +174,7 @@
 
 		{#each programmingProjects as data, i}
 			{@const links = getExternalLinks(data)}
-			{@const tags = getProjectTags(data)}
 			{@const primaryLink = links[0]}
-			{@const displaySource = getDisplaySource(data)}
 			{@const media = resolveProjectMedia(data)}
 			<div
 				id="programming-{i}"
@@ -210,22 +190,18 @@
 					<ProjectSpherePreview
 						textureUrl={data.previewImageUrl}
 						title={data.title}
-						videoProvider={data.videoProvider}
-						previewSource={data.previewSource}
-						sourceLabel={displaySource}
+						videoProvider={media.provider || data.videoProvider}
 						mediaKind={media.kind}
 						mediaEmbedSrc={media.embedSrc}
 						mediaAllow={media.allow}
 						reducedMotion={prefersReducedMotion}
-						on:open={() => openInApp(null, data, 'programming')}
 					/>
-					<span class="project-card__source">{displaySource}</span>
 				</div>
 
 				<div class="project-card__body">
 					<p class="project-card__type">{data.type || 'Programming Project'}</p>
 					<h2
-						class="adaptive-text"
+						class="adaptive-text text-contrast-strong"
 						class:text-white={adaptiveTextClass === 'text-white'}
 						class:text-gray-900={adaptiveTextClass === 'text-gray-900'}
 					>
@@ -233,7 +209,7 @@
 					</h2>
 					{#if data.description}
 						<p
-							class="adaptive-subtext"
+							class="adaptive-subtext text-contrast-soft"
 							class:text-gray-300={adaptiveSubTextClass === 'text-gray-300'}
 							class:text-gray-200={adaptiveSubTextClass === 'text-gray-200'}
 							class:text-gray-700={adaptiveSubTextClass === 'text-gray-700'}
@@ -242,22 +218,7 @@
 						</p>
 					{/if}
 
-					{#if tags.length > 0}
-						<div class="project-tags">
-							{#each tags as tag}
-								<span>{tag}</span>
-							{/each}
-						</div>
-					{/if}
-
 					<div class="project-card__actions">
-						<button
-							type="button"
-							class="project-open"
-							on:click={(event) => openInApp(event, data, 'programming')}
-						>
-							Open project
-						</button>
 						{#if primaryLink}
 							<a href={primaryLink.url} target="_blank" rel="noopener noreferrer" on:click|stopPropagation>{primaryLink.label} ↗</a>
 						{/if}
@@ -277,36 +238,32 @@
 	}
 
 	.project-card {
-		--card-surface-a: rgba(11, 17, 30, 0.62);
-		--card-surface-b: rgba(8, 13, 24, 0.78);
-		--card-outline: rgba(202, 221, 255, 0.24);
-		--card-outline-strong: rgba(224, 236, 255, 0.38);
-		--card-liquid-cyan: rgba(123, 198, 255, 0.2);
-		--card-liquid-pink: rgba(255, 128, 196, 0.16);
-		--card-shadow: 0 20px 44px -28px rgba(0, 0, 0, 0.8);
-		--card-shadow-hover: 0 24px 54px -30px rgba(0, 0, 0, 0.88);
-		--card-lift: -3px;
+		--card-surface-a: rgba(8, 11, 18, 0.02);
+		--card-surface-b: rgba(18, 28, 42, 0.03);
+		--card-liquid-cyan: rgba(78, 204, 255, 0.08);
+		--card-liquid-pink: rgba(255, 69, 165, 0.07);
+		--card-acid: rgba(220, 255, 78, 0.04);
+		--card-shadow: 0 38px 80px -52px rgba(0, 0, 0, 0.62);
+		--card-shadow-hover: 0 46px 96px -56px rgba(0, 0, 0, 0.78);
+		--card-lift: -2px;
 	}
 
 	.project-card {
 		position: relative;
 		overflow: hidden;
-		border-radius: 20px;
-		padding: clamp(1rem, 0.85vw + 0.88rem, 1.28rem);
-		border: 1px solid var(--card-outline);
+		border-radius: 34px 8px 42px 12px;
+		padding: clamp(0.48rem, 0.48vw + 0.42rem, 0.72rem);
 		background:
-			radial-gradient(circle at 0% 100%, var(--card-liquid-cyan), transparent 56%),
-			radial-gradient(circle at 96% 4%, var(--card-liquid-pink), transparent 52%),
+			radial-gradient(circle at 8% 12%, var(--card-liquid-cyan), transparent 34%),
+			radial-gradient(circle at 88% 14%, var(--card-liquid-pink), transparent 28%),
+			radial-gradient(circle at 52% 100%, var(--card-acid), transparent 30%),
 			linear-gradient(154deg, var(--card-surface-a), var(--card-surface-b));
-		backdrop-filter: blur(8px) saturate(128%);
-		-webkit-backdrop-filter: blur(8px) saturate(128%);
-		box-shadow:
-			var(--card-shadow),
-			0 1px 0 rgba(255, 255, 255, 0.11) inset,
-			0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+		backdrop-filter: blur(3px) saturate(118%);
+		-webkit-backdrop-filter: blur(3px) saturate(118%);
+		box-shadow: var(--card-shadow);
+		isolation: isolate;
 		transition:
 			transform var(--dur-med) var(--ease-emph),
-			border-color var(--dur-med) var(--ease-std),
 			box-shadow var(--dur-med) var(--ease-std),
 			background-position var(--dur-slow) var(--ease-std);
 	}
@@ -314,142 +271,105 @@
 	.project-card::before {
 		content: '';
 		position: absolute;
-		inset: 0 auto auto 0;
-		top: 0;
-		width: 100%;
-		height: 1px;
-		background: linear-gradient(
-			90deg,
-			rgba(255, 255, 255, 0.04),
-			rgba(200, 223, 255, 0.58) 38%,
-			rgba(255, 176, 219, 0.36) 72%,
-			rgba(255, 255, 255, 0.04)
-		);
+		inset: 0;
+		background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 28%);
+		opacity: 0.24;
 		pointer-events: none;
 	}
 
 	.project-card::after {
 		content: '';
 		position: absolute;
-		inset: -22% -16% auto;
-		height: 42%;
-		background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.07), transparent 70%);
-		opacity: 0.55;
-		filter: blur(12px);
+		inset: auto -12% -18% 22%;
+		height: 58%;
+		background:
+			conic-gradient(
+				from 220deg at 50% 50%,
+				rgba(255, 88, 172, 0.16),
+				rgba(112, 216, 255, 0.06),
+				transparent 58%,
+				rgba(218, 255, 72, 0.08),
+				rgba(255, 88, 172, 0.16)
+			);
+		opacity: 0.42;
+		filter: blur(28px);
 		pointer-events: none;
+		z-index: 0;
 	}
 
 	.project-card:hover,
 	.project-card:focus-visible {
 		transform: translateY(var(--card-lift));
-		border-color: var(--card-outline-strong);
-		box-shadow:
-			var(--card-shadow-hover),
-			0 1px 0 rgba(255, 255, 255, 0.14) inset,
-			0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+		box-shadow: var(--card-shadow-hover);
 	}
 
 	.project-card:focus-visible {
 		outline: none;
 		box-shadow:
 			var(--card-shadow-hover),
-			0 0 0 1px rgba(255, 255, 255, 0.08) inset,
-			0 0 0 2px rgba(143, 214, 255, 0.4);
+			0 0 0 1px rgba(129, 223, 255, 0.08);
 	}
 
 	.project-card__media {
 		position: relative;
 		width: 100%;
 		aspect-ratio: 16 / 9;
-		border-radius: 14px;
+		border-radius: 30px 6px 38px 8px;
 		overflow: hidden;
-		border: 1px solid rgba(195, 216, 255, 0.24);
 		background:
-			radial-gradient(circle at 16% 18%, rgba(143, 214, 255, 0.2), transparent 58%),
-			radial-gradient(circle at 86% 86%, rgba(255, 126, 194, 0.18), transparent 62%),
-			#060a14;
+			radial-gradient(circle at 16% 18%, rgba(143, 214, 255, 0.24), transparent 42%),
+			radial-gradient(circle at 86% 86%, rgba(255, 126, 194, 0.22), transparent 46%),
+			linear-gradient(135deg, rgba(6, 10, 20, 0.84), rgba(5, 9, 18, 0.64));
 		box-shadow:
-			0 12px 24px rgba(0, 0, 0, 0.42),
-			inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+			0 26px 44px -34px rgba(0, 0, 0, 0.84),
+			-18px 0 30px -28px rgba(87, 214, 255, 0.22),
+			20px 0 34px -30px rgba(255, 73, 166, 0.18);
 	}
 
 	.project-card__media::after {
 		content: '';
 		position: absolute;
 		inset: 0;
-		background:
-			linear-gradient(180deg, rgba(6, 10, 20, 0) 46%, rgba(6, 10, 20, 0.24) 100%),
-			radial-gradient(circle at 50% -30%, rgba(255, 255, 255, 0.18), transparent 60%);
+		background: linear-gradient(180deg, rgba(6, 10, 20, 0.04) 12%, rgba(6, 10, 20, 0.42) 100%);
 		pointer-events: none;
 	}
 
-	.project-card__source {
-		position: absolute;
-		right: 0.6rem;
-		top: 0.6rem;
-		padding: 0.2rem 0.48rem;
-		border-radius: 999px;
-		border: 1px solid rgba(255, 255, 255, 0.18);
-		background: rgba(7, 11, 20, 0.62);
-		backdrop-filter: blur(8px) saturate(120%);
-		-webkit-backdrop-filter: blur(8px) saturate(120%);
-		font-family: var(--font-label);
-		font-size: 0.56rem;
-		letter-spacing: 0.06em;
-		text-transform: uppercase;
-		color: rgba(228, 237, 255, 0.86);
-	}
-
 	.project-card__body {
-		margin-top: 0.84rem;
+		margin-top: 0.48rem;
 		display: grid;
 		gap: 0.56rem;
+		padding: 0 0.28rem 0.24rem;
 	}
 
 	.project-card__type {
 		margin: 0;
 		font-family: var(--font-label);
-		font-size: 0.64rem;
-		letter-spacing: 0.095em;
+		font-size: 0.58rem;
+		letter-spacing: 0.19em;
 		text-transform: uppercase;
-		color: rgba(188, 213, 245, 0.8);
+		color: rgba(244, 248, 255, 0.92);
+		text-shadow:
+			0 1px 0 rgba(0, 0, 0, 0.8),
+			0 0.15em 0.45em rgba(0, 0, 0, 0.52);
 	}
 
 	.project-card .adaptive-text {
 		margin: 0;
 		font-family: var(--font-display);
-		font-size: clamp(1.1rem, 0.94rem + 0.52vw, 1.3rem);
+		font-size: clamp(1.16rem, 0.96rem + 0.66vw, 1.44rem);
 		font-weight: 700;
-		line-height: 1.25;
-		letter-spacing: 0.006em;
-		text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+		line-height: 1.16;
+		letter-spacing: 0.045em;
+		text-transform: uppercase;
 	}
 
 	.project-card .adaptive-subtext {
 		margin: 0;
 		font-family: var(--font-body);
-		font-size: clamp(0.8rem, 0.74rem + 0.18vw, 0.9rem);
-		line-height: 1.58;
-		letter-spacing: 0.004em;
-		color: rgba(215, 226, 246, 0.9);
-	}
-
-	.project-tags {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.38rem;
-	}
-
-	.project-tags span {
-		font-family: var(--font-label);
-		font-size: 0.56rem;
-		text-transform: uppercase;
-		letter-spacing: 0.065em;
-		border-radius: 999px;
-		padding: 0.22rem 0.52rem;
-		background: rgba(173, 206, 255, 0.08);
-		border: 1px solid rgba(179, 208, 255, 0.22);
-		color: rgba(209, 225, 250, 0.9);
+		font-size: clamp(0.82rem, 0.76rem + 0.18vw, 0.92rem);
+		line-height: 1.6;
+		letter-spacing: 0.016em;
+		color: rgba(248, 251, 255, 0.96);
 	}
 
 	.project-card__actions {
@@ -459,27 +379,22 @@
 		padding-top: 0.26rem;
 	}
 
-	.project-card__actions a,
-	.project-open {
+	.project-card__actions a {
 		text-decoration: none;
 		font-family: var(--font-label);
-		font-size: 0.61rem;
-		letter-spacing: 0.072em;
+		font-size: 0.56rem;
+		letter-spacing: 0.13em;
 		text-transform: uppercase;
 		padding: 0;
 		background: transparent;
-		border: none;
-		color: rgba(217, 229, 250, 0.92);
-		cursor: pointer;
-		border-bottom: 1px solid rgba(187, 210, 255, 0.22);
+		color: rgba(217, 229, 250, 0.72);
+		border-bottom: 1px solid rgba(187, 210, 255, 0.12);
 	}
 
 	.project-card__actions a:hover,
-	.project-card__actions a:focus-visible,
-	.project-open:hover,
-	.project-open:focus-visible {
-		color: rgba(255, 188, 226, 0.98);
-		border-bottom-color: rgba(255, 188, 226, 0.86);
+	.project-card__actions a:focus-visible {
+		color: rgba(236, 255, 134, 0.98);
+		border-bottom-color: rgba(236, 255, 134, 0.64);
 		outline: none;
 	}
 
@@ -492,24 +407,23 @@
 	@media (max-width: 900px) {
 		.project-card {
 			padding: 0.9rem;
-			border-radius: 18px;
+			padding: 0.42rem;
+			border-radius: 24px 8px 30px 10px;
 		}
 
 		.project-card .adaptive-text {
 			font-size: var(--step-1);
 		}
 
-		.project-card__source {
-			font-size: 0.62rem;
-			padding: 0.26rem 0.56rem;
+		.project-card__media {
+			border-radius: 22px 6px 28px 8px;
 		}
 
 		.project-card__actions {
 			gap: 0.5rem;
 		}
 
-		.project-card__actions a,
-		.project-open {
+		.project-card__actions a {
 			display: inline-flex;
 			align-items: center;
 			min-height: 40px;
@@ -517,15 +431,15 @@
 			font-size: 0.68rem;
 			letter-spacing: 0.065em;
 			border-radius: 999px;
-			border: 1px solid rgba(187, 210, 255, 0.24);
-			border-bottom: 1px solid rgba(187, 210, 255, 0.24);
-			background: rgba(7, 11, 20, 0.34);
+			border: none;
+			border-bottom: 1px solid rgba(187, 210, 255, 0.16);
+			background: rgba(7, 11, 20, 0.22);
 		}
 	}
 
 	@media (prefers-reduced-motion: reduce) {
 		.project-card {
-			transition: border-color var(--dur-fast) var(--ease-std), box-shadow var(--dur-fast) var(--ease-std);
+			transition: box-shadow var(--dur-fast) var(--ease-std);
 		}
 
 		.project-card:hover,
